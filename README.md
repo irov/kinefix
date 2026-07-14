@@ -3,9 +3,26 @@
 `kinefix` is a small deterministic math and collision library written in ISO C11.
 
 It provides signed Q32.32 arithmetic, fixed-point vector/trigonometric operations,
-PCG32 random streams, AABB/sphere sweeps, line queries, and a deterministic
-non-rotating character-body step. Authoritative functions do not call the system
-floating-point math library.
+PCG32 random streams, and deterministic collision queries. Authoritative functions
+do not call the system floating-point math library.
+
+Collision primitives and queries include:
+
+- AABB, sphere, ray, and Y-up capsule shapes;
+- AABB/sphere/capsule overlap tests;
+- parametric raycasts and continuous sphere/capsule sweeps;
+- `kf_hit_t` results with fraction, distance, position, normal, stable object id,
+  and initial-overlap state;
+- deterministic world queries selecting the earliest hit and then the lowest
+  object id when hit fractions are equal;
+- a capsule-based character controller with continuous movement, skin width,
+  stepping, sliding, floor/ceiling contacts, and high-speed tunneling prevention.
+
+`kf_capsule_t.position` is the bottom-center reference point, `height` is its full
+height, and the capsule is aligned with the Y axis. Sweep displacement is the full
+motion for one query; returned `fraction` is always in the inclusive `[0, 1]`
+interval. Capsule-vs-AABB sweeps conservatively cast against the AABB expanded by
+the capsule radius, so they prefer an early contact over tunneling at box corners.
 
 ```sh
 cmake -S . -B build -DKINEFIX_BUILD_TESTS=ON

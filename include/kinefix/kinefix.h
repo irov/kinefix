@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 #define KF_VERSION_MAJOR 1
-#define KF_VERSION_MINOR 0
+#define KF_VERSION_MINOR 1
 #define KF_VERSION_PATCH 0
 
 #define KF_FIXED_FRACTION_BITS 32
@@ -54,6 +54,37 @@ typedef struct kf_aabb_t
     kf_fixed_t maximum[3];
 } kf_aabb_t;
 
+typedef struct kf_sphere_t
+{
+    kf_vec3_t position;
+    kf_fixed_t radius;
+} kf_sphere_t;
+
+/* Y-up character capsule. Position is the bottom of the capsule. */
+typedef struct kf_capsule_t
+{
+    kf_vec3_t position;
+    kf_fixed_t radius;
+    kf_fixed_t height;
+} kf_capsule_t;
+
+typedef struct kf_ray_t
+{
+    kf_vec3_t origin;
+    kf_vec3_t direction;
+    kf_fixed_t maximum_distance;
+} kf_ray_t;
+
+typedef struct kf_hit_t
+{
+    uint32_t object_id;
+    kf_fixed_t fraction;
+    kf_fixed_t distance;
+    kf_vec3_t position;
+    kf_vec3_t normal;
+    uint8_t started_inside;
+} kf_hit_t;
+
 typedef struct kf_character_body_t
 {
     kf_vec3_t position;
@@ -63,7 +94,7 @@ typedef struct kf_character_body_t
 
 typedef struct kf_character_config_t
 {
-    kf_fixed_t half_width;
+    kf_fixed_t radius;
     kf_fixed_t height;
     kf_fixed_t step_height;
     kf_fixed_t gravity;
@@ -74,10 +105,12 @@ typedef struct kf_character_config_t
 
 typedef struct kf_character_result_t
 {
+    kf_hit_t hit;
     kf_fixed_t previous_vertical_velocity;
     uint8_t landed;
     uint8_t hit_ceiling;
     uint8_t stepped;
+    uint8_t blocked;
 } kf_character_result_t;
 
 void kf_fault_clear( kf_fault_t * fault );
@@ -124,6 +157,25 @@ int kf_aabb_overlaps_character( const kf_aabb_t * box, kf_vec3_t position, kf_fi
 int kf_world_character_collides( const kf_aabb_t * boxes, size_t count, kf_vec3_t position, kf_fixed_t half_width, kf_fixed_t height );
 int kf_world_find_step_top( const kf_aabb_t * boxes, size_t count, kf_vec3_t candidate,
     kf_fixed_t half_width, kf_fixed_t height, kf_fixed_t current_y, kf_fixed_t maximum_step, kf_fixed_t * top );
+
+int kf_overlap_aabb_aabb( const kf_aabb_t * left, const kf_aabb_t * right );
+int kf_overlap_sphere_aabb( const kf_sphere_t * sphere, const kf_aabb_t * box );
+int kf_overlap_capsule_aabb( const kf_capsule_t * capsule, const kf_aabb_t * box );
+int kf_overlap_sphere_capsule( const kf_sphere_t * sphere, const kf_capsule_t * capsule );
+int kf_world_overlap_capsule( const kf_aabb_t * boxes, size_t count, const kf_capsule_t * capsule, uint32_t * brush_id );
+
+int kf_raycast_aabb( const kf_ray_t * ray, const kf_aabb_t * box, kf_hit_t * hit );
+int kf_raycast_capsule( const kf_ray_t * ray, const kf_capsule_t * capsule, uint32_t object_id, kf_hit_t * hit );
+int kf_world_raycast( const kf_aabb_t * boxes, size_t count, const kf_ray_t * ray, kf_hit_t * hit );
+int kf_sweep_sphere_aabb_hit( const kf_sphere_t * sphere, kf_vec3_t displacement, const kf_aabb_t * box, kf_hit_t * hit );
+int kf_world_sweep_sphere_hit( const kf_aabb_t * boxes, size_t count, const kf_sphere_t * sphere,
+    kf_vec3_t displacement, kf_hit_t * hit );
+int kf_sweep_sphere_capsule( const kf_sphere_t * sphere, kf_vec3_t displacement,
+    const kf_capsule_t * capsule, uint32_t object_id, kf_hit_t * hit );
+int kf_sweep_capsule_aabb( const kf_capsule_t * capsule, kf_vec3_t displacement, const kf_aabb_t * box, kf_hit_t * hit );
+int kf_world_sweep_capsule( const kf_aabb_t * boxes, size_t count, const kf_capsule_t * capsule,
+    kf_vec3_t displacement, kf_hit_t * hit );
+
 int kf_sweep_sphere_aabb( kf_vec3_t start, kf_vec3_t end, kf_fixed_t radius, const kf_aabb_t * box, kf_fixed_t * hit_time );
 int kf_world_sweep_sphere( const kf_aabb_t * boxes, size_t count, kf_vec3_t start, kf_vec3_t end,
     kf_fixed_t radius, kf_fixed_t * hit_time, uint32_t * brush_id );

@@ -501,21 +501,442 @@ void kf_pcg32_restore( kf_pcg32_t * random, uint64_t state, uint64_t stream )
     random->increment = stream | UINT64_C(1);
 }
 
+static kf_vec3_t kf_normal_axis( size_t axis, int sign )
+{
+    kf_vec3_t normal = {0, 0, 0};
+    const kf_fixed_t value = sign < 0 ? -KF_FIXED_SCALE : KF_FIXED_SCALE;
+    if( axis == 0 ) normal.x = value;
+    else if( axis == 1 ) normal.y = value;
+    else normal.z = value;
+    return normal;
+}
+
+static int kf_sweep_point_bounds( kf_vec3_t origin, kf_vec3_t displacement,
+    const kf_fixed_t minimum[3], const kf_fixed_t maximum[3], uint32_t object_id, kf_hit_t * hit )
+{
+    const kf_fixed_t origins[3] = {origin.x, origin.y, origin.z};
+    const kf_fixed_t deltas[3] = {displacement.x, displacement.y, displacement.z};
+    kf_fixed_t entry = 0;
+    kf_fixed_t exit = KF_FIXED_SCALE;
+    size_t entry_axis = 3;
+    int entry_sign = 0;
+    int started_inside = 1;
+    size_t axis;
+
+    for( axis = 0; axis != 3; ++axis )
+    {
+        const kf_fixed_t end = kf_fixed_add( origins[axis], deltas[axis] );
+        kf_fixed_t axis_entry = 0;
+        kf_fixed_t axis_exit = KF_FIXED_SCALE;
+        int axis_sign = 0;
+
+        if( origins[axis] <= minimum[axis] || origins[axis] >= maximum[axis] ) started_inside = 0;
+
+        if( deltas[axis] > 0 )
+        {
+            if( origins[axis] > maximum[axis] || end < minimum[axis] ) return 0;
+            if( origins[axis] < minimum[axis] )
+            {
+                axis_entry = kf_fixed_div( kf_fixed_sub( minimum[axis], origins[axis] ), deltas[axis] );
+                axis_sign = -1;
+            }
+            else if( origins[axis] == minimum[axis] )
+            {
+                axis_sign = -1;
+            }
+            if( end > maximum[axis] ) axis_exit = kf_fixed_div( kf_fixed_sub( maximum[axis], origins[axis] ), deltas[axis] );
+        }
+        else if( deltas[axis] < 0 )
+        {
+            if( origins[axis] < minimum[axis] || end > maximum[axis] ) return 0;
+            if( origins[axis] > maximum[axis] )
+            {
+                axis_entry = kf_fixed_div( kf_fixed_sub( maximum[axis], origins[axis] ), deltas[axis] );
+                axis_sign = 1;
+            }
+            else if( origins[axis] == maximum[axis] )
+            {
+                axis_sign = 1;
+            }
+            if( end < minimum[axis] ) axis_exit = kf_fixed_div( kf_fixed_sub( minimum[axis], origins[axis] ), deltas[axis] );
+        }
+        else if( origins[axis] <= minimum[axis] || origins[axis] >= maximum[axis] )
+        {
+            return 0;
+        }
+
+        if( axis_entry > entry || (axis_entry == entry && entry_axis == 3 && axis_sign != 0) )
+        {
+            entry = axis_entry;
+            entry_axis = axis;
+            entry_sign = axis_sign;
+        }
+        exit = kf_fixed_min( exit, axis_exit );
+        if( entry > exit ) return 0;
+    }
+
+    if( exit <= 0 || entry > KF_FIXED_SCALE ) return 0;
+    if( hit != NULL )
+    {
+        memset( hit, 0, sizeof( *hit ) );
+        hit->object_id = object_id;
+        hit->fraction = kf_fixed_clamp( entry, 0, KF_FIXED_SCALE );
+        hit->position = kf_vec3_add( origin, kf_vec3_mul( displacement, hit->fraction ) );
+        hit->normal = entry_axis == 3 ? (kf_vec3_t){0, 0, 0} : kf_normal_axis( entry_axis, entry_sign );
+        hit->started_inside = (uint8_t)started_inside;
+    }
+    return 1;
+}
+
+static int kf_hit_precedes( const kf_hit_t * candidate, const kf_hit_t * selected, int has_selected )
+{
+    return has_selected == 0 || candidate->fraction < selected->fraction ||
+        (candidate->fraction == selected->fraction && candidate->object_id < selected->object_id);
+}
+
+static int kf_capsule_valid( const kf_capsule_t * capsule )
+{
+    if( capsule != NULL && capsule->radius >= 0 && capsule->height >= kf_fixed_mul( capsule->radius, kf_fixed_from_int( 2 ) ) ) return 1;
+    kf_raise_bound( KF_FAULT_INVALID_CONFIGURATION, "capsule" );
+    return 0;
+}
+
+int kf_overlap_aabb_aabb( const kf_aabb_t * left, const kf_aabb_t * right )
+{
+    if( left == NULL || right == NULL ) return 0;
+    return left->maximum[0] > right->minimum[0] && left->minimum[0] < right->maximum[0] &&
+        left->maximum[1] > right->minimum[1] && left->minimum[1] < right->maximum[1] &&
+        left->maximum[2] > right->minimum[2] && left->minimum[2] < right->maximum[2];
+}
+
+int kf_overlap_sphere_aabb( const kf_sphere_t * sphere, const kf_aabb_t * box )
+{
+    kf_fixed_t dx;
+    kf_fixed_t dy;
+    kf_fixed_t dz;
+    kf_fixed_t distance_squared;
+    if( sphere == NULL || box == NULL || sphere->radius < 0 ) return 0;
+    dx = sphere->position.x < box->minimum[0] ? kf_fixed_sub( box->minimum[0], sphere->position.x ) :
+        (sphere->position.x > box->maximum[0] ? kf_fixed_sub( sphere->position.x, box->maximum[0] ) : 0);
+    dy = sphere->position.y < box->minimum[1] ? kf_fixed_sub( box->minimum[1], sphere->position.y ) :
+        (sphere->position.y > box->maximum[1] ? kf_fixed_sub( sphere->position.y, box->maximum[1] ) : 0);
+    dz = sphere->position.z < box->minimum[2] ? kf_fixed_sub( box->minimum[2], sphere->position.z ) :
+        (sphere->position.z > box->maximum[2] ? kf_fixed_sub( sphere->position.z, box->maximum[2] ) : 0);
+    distance_squared = kf_fixed_add( kf_fixed_add( kf_fixed_mul( dx, dx ), kf_fixed_mul( dy, dy ) ), kf_fixed_mul( dz, dz ) );
+    return distance_squared < kf_fixed_mul( sphere->radius, sphere->radius );
+}
+
+int kf_overlap_capsule_aabb( const kf_capsule_t * capsule, const kf_aabb_t * box )
+{
+    kf_fixed_t segment_minimum_y;
+    kf_fixed_t segment_maximum_y;
+    kf_fixed_t dx;
+    kf_fixed_t dy;
+    kf_fixed_t dz;
+    kf_fixed_t distance_squared;
+    if( box == NULL || kf_capsule_valid( capsule ) == 0 ) return 0;
+    segment_minimum_y = kf_fixed_add( capsule->position.y, capsule->radius );
+    segment_maximum_y = kf_fixed_sub( kf_fixed_add( capsule->position.y, capsule->height ), capsule->radius );
+    dx = capsule->position.x < box->minimum[0] ? kf_fixed_sub( box->minimum[0], capsule->position.x ) :
+        (capsule->position.x > box->maximum[0] ? kf_fixed_sub( capsule->position.x, box->maximum[0] ) : 0);
+    dy = segment_maximum_y < box->minimum[1] ? kf_fixed_sub( box->minimum[1], segment_maximum_y ) :
+        (segment_minimum_y > box->maximum[1] ? kf_fixed_sub( segment_minimum_y, box->maximum[1] ) : 0);
+    dz = capsule->position.z < box->minimum[2] ? kf_fixed_sub( box->minimum[2], capsule->position.z ) :
+        (capsule->position.z > box->maximum[2] ? kf_fixed_sub( capsule->position.z, box->maximum[2] ) : 0);
+    distance_squared = kf_fixed_add( kf_fixed_add( kf_fixed_mul( dx, dx ), kf_fixed_mul( dy, dy ) ), kf_fixed_mul( dz, dz ) );
+    return distance_squared < kf_fixed_mul( capsule->radius, capsule->radius );
+}
+
+int kf_overlap_sphere_capsule( const kf_sphere_t * sphere, const kf_capsule_t * capsule )
+{
+    kf_fixed_t segment_minimum_y;
+    kf_fixed_t segment_maximum_y;
+    kf_fixed_t closest_y;
+    kf_fixed_t combined_radius;
+    kf_vec3_t closest;
+    if( sphere == NULL || sphere->radius < 0 || kf_capsule_valid( capsule ) == 0 ) return 0;
+    segment_minimum_y = kf_fixed_add( capsule->position.y, capsule->radius );
+    segment_maximum_y = kf_fixed_sub( kf_fixed_add( capsule->position.y, capsule->height ), capsule->radius );
+    closest_y = kf_fixed_clamp( sphere->position.y, segment_minimum_y, segment_maximum_y );
+    closest = (kf_vec3_t){capsule->position.x, closest_y, capsule->position.z};
+    combined_radius = kf_fixed_add( sphere->radius, capsule->radius );
+    return kf_vec3_length_squared( kf_vec3_sub( sphere->position, closest ) ) < kf_fixed_mul( combined_radius, combined_radius );
+}
+
+int kf_world_overlap_capsule( const kf_aabb_t * boxes, size_t count, const kf_capsule_t * capsule, uint32_t * brush_id )
+{
+    size_t index;
+    int found = 0;
+    uint32_t selected_id = UINT32_MAX;
+    for( index = 0; index != count; ++index )
+    {
+        if( kf_overlap_capsule_aabb( capsule, boxes + index ) == 0 ) continue;
+        if( found == 0 || boxes[index].id < selected_id )
+        {
+            found = 1;
+            selected_id = boxes[index].id;
+        }
+    }
+    if( found != 0 && brush_id != NULL ) *brush_id = selected_id;
+    return found;
+}
+
+int kf_raycast_aabb( const kf_ray_t * ray, const kf_aabb_t * box, kf_hit_t * hit )
+{
+    kf_vec3_t direction;
+    kf_vec3_t displacement;
+    int result;
+    if( ray == NULL || box == NULL || ray->maximum_distance <= 0 ) return 0;
+    direction = kf_vec3_normalize( ray->direction );
+    if( kf_vec3_length_squared( direction ) == 0 ) return 0;
+    displacement = kf_vec3_mul( direction, ray->maximum_distance );
+    result = kf_sweep_point_bounds( ray->origin, displacement, box->minimum, box->maximum, box->id, hit );
+    if( result != 0 && hit != NULL ) hit->distance = kf_fixed_mul( ray->maximum_distance, hit->fraction );
+    return result;
+}
+
+int kf_world_raycast( const kf_aabb_t * boxes, size_t count, const kf_ray_t * ray, kf_hit_t * hit )
+{
+    size_t index;
+    int found = 0;
+    kf_hit_t selected;
+    for( index = 0; index != count; ++index )
+    {
+        kf_hit_t candidate;
+        if( kf_raycast_aabb( ray, boxes + index, &candidate ) == 0 ) continue;
+        if( kf_hit_precedes( &candidate, &selected, found ) != 0 )
+        {
+            selected = candidate;
+            found = 1;
+        }
+    }
+    if( found != 0 && hit != NULL ) *hit = selected;
+    return found;
+}
+
+int kf_sweep_sphere_aabb_hit( const kf_sphere_t * sphere, kf_vec3_t displacement, const kf_aabb_t * box, kf_hit_t * hit )
+{
+    kf_fixed_t minimum[3];
+    kf_fixed_t maximum[3];
+    int result;
+    if( sphere == NULL || box == NULL || sphere->radius < 0 ) return 0;
+    minimum[0] = kf_fixed_sub( box->minimum[0], sphere->radius );
+    minimum[1] = kf_fixed_sub( box->minimum[1], sphere->radius );
+    minimum[2] = kf_fixed_sub( box->minimum[2], sphere->radius );
+    maximum[0] = kf_fixed_add( box->maximum[0], sphere->radius );
+    maximum[1] = kf_fixed_add( box->maximum[1], sphere->radius );
+    maximum[2] = kf_fixed_add( box->maximum[2], sphere->radius );
+    result = kf_sweep_point_bounds( sphere->position, displacement, minimum, maximum, box->id, hit );
+    if( result != 0 && hit != NULL ) hit->distance = kf_fixed_mul( kf_vec3_length( displacement ), hit->fraction );
+    return result;
+}
+
+int kf_world_sweep_sphere_hit( const kf_aabb_t * boxes, size_t count, const kf_sphere_t * sphere,
+    kf_vec3_t displacement, kf_hit_t * hit )
+{
+    size_t index;
+    int found = 0;
+    kf_hit_t selected;
+    for( index = 0; index != count; ++index )
+    {
+        kf_hit_t candidate;
+        if( kf_sweep_sphere_aabb_hit( sphere, displacement, boxes + index, &candidate ) == 0 ) continue;
+        if( kf_hit_precedes( &candidate, &selected, found ) != 0 )
+        {
+            selected = candidate;
+            found = 1;
+        }
+    }
+    if( found != 0 && hit != NULL ) *hit = selected;
+    return found;
+}
+
+static size_t kf_quadratic_roots( kf_fixed_t a, kf_fixed_t b, kf_fixed_t c, kf_fixed_t roots[2] )
+{
+    const kf_fixed_t two = KF_FIXED_SCALE * INT64_C(2);
+    const kf_fixed_t four = KF_FIXED_SCALE * INT64_C(4);
+    kf_fixed_t discriminant;
+    kf_fixed_t square_root;
+    kf_fixed_t denominator;
+    if( a == 0 )
+    {
+        if( b == 0 ) return 0;
+        roots[0] = kf_fixed_div( kf_fixed_neg( c ), b );
+        return 1;
+    }
+    discriminant = kf_fixed_sub( kf_fixed_mul( b, b ), kf_fixed_mul( four, kf_fixed_mul( a, c ) ) );
+    if( discriminant < 0 ) return 0;
+    square_root = kf_fixed_sqrt( discriminant );
+    denominator = kf_fixed_mul( two, a );
+    roots[0] = kf_fixed_div( kf_fixed_sub( kf_fixed_neg( b ), square_root ), denominator );
+    roots[1] = kf_fixed_div( kf_fixed_add( kf_fixed_neg( b ), square_root ), denominator );
+    return 2;
+}
+
+static void kf_consider_capsule_root( kf_fixed_t root, kf_fixed_t maximum_distance,
+    kf_fixed_t a, kf_fixed_t b, int restrict_y, kf_fixed_t y, kf_fixed_t minimum_y, kf_fixed_t maximum_y,
+    int * found, kf_fixed_t * selected )
+{
+    const kf_fixed_t derivative = kf_fixed_add( kf_fixed_mul( kf_fixed_mul( KF_FIXED_SCALE * INT64_C(2), a ), root ), b );
+    if( root < 0 || root > maximum_distance || derivative >= 0 ) return;
+    if( restrict_y != 0 && (y < minimum_y || y > maximum_y) ) return;
+    if( *found == 0 || root < *selected )
+    {
+        *found = 1;
+        *selected = root;
+    }
+}
+
+int kf_sweep_sphere_capsule( const kf_sphere_t * sphere, kf_vec3_t displacement,
+    const kf_capsule_t * capsule, uint32_t object_id, kf_hit_t * hit )
+{
+    const kf_fixed_t two = KF_FIXED_SCALE * INT64_C(2);
+    kf_vec3_t direction;
+    kf_fixed_t length;
+    kf_fixed_t combined_radius;
+    kf_fixed_t radius_squared;
+    kf_fixed_t segment_minimum_y;
+    kf_fixed_t segment_maximum_y;
+    kf_fixed_t roots[2];
+    kf_fixed_t selected = 0;
+    int found = 0;
+    size_t root_count;
+    size_t index;
+    kf_vec3_t relative;
+    kf_fixed_t a;
+    kf_fixed_t b;
+    kf_fixed_t c;
+    kf_vec3_t centers[2];
+
+    if( sphere == NULL || sphere->radius < 0 || kf_capsule_valid( capsule ) == 0 ) return 0;
+    length = kf_vec3_length( displacement );
+    if( length == 0 )
+    {
+        if( kf_overlap_sphere_capsule( sphere, capsule ) == 0 ) return 0;
+        if( hit != NULL )
+        {
+            memset( hit, 0, sizeof( *hit ) );
+            hit->object_id = object_id;
+            hit->position = sphere->position;
+            hit->started_inside = 1;
+        }
+        return 1;
+    }
+    direction = kf_vec3_div( displacement, length );
+    combined_radius = kf_fixed_add( sphere->radius, capsule->radius );
+    radius_squared = kf_fixed_mul( combined_radius, combined_radius );
+    segment_minimum_y = kf_fixed_add( capsule->position.y, capsule->radius );
+    segment_maximum_y = kf_fixed_sub( kf_fixed_add( capsule->position.y, capsule->height ), capsule->radius );
+
+    if( kf_overlap_sphere_capsule( sphere, capsule ) != 0 )
+    {
+        selected = 0;
+        found = 1;
+    }
+    else
+    {
+        relative = kf_vec3_sub( sphere->position, capsule->position );
+        a = kf_fixed_add( kf_fixed_mul( direction.x, direction.x ), kf_fixed_mul( direction.z, direction.z ) );
+        b = kf_fixed_mul( two, kf_fixed_add( kf_fixed_mul( relative.x, direction.x ), kf_fixed_mul( relative.z, direction.z ) ) );
+        c = kf_fixed_sub( kf_fixed_add( kf_fixed_mul( relative.x, relative.x ), kf_fixed_mul( relative.z, relative.z ) ), radius_squared );
+        root_count = kf_quadratic_roots( a, b, c, roots );
+        for( index = 0; index != root_count; ++index )
+        {
+            const kf_fixed_t y = kf_fixed_add( sphere->position.y, kf_fixed_mul( direction.y, roots[index] ) );
+            kf_consider_capsule_root( roots[index], length, a, b, 1, y, segment_minimum_y, segment_maximum_y, &found, &selected );
+        }
+
+        centers[0] = (kf_vec3_t){capsule->position.x, segment_minimum_y, capsule->position.z};
+        centers[1] = (kf_vec3_t){capsule->position.x, segment_maximum_y, capsule->position.z};
+        for( index = 0; index != 2; ++index )
+        {
+            relative = kf_vec3_sub( sphere->position, centers[index] );
+            a = KF_FIXED_SCALE;
+            b = kf_fixed_mul( two, kf_vec3_dot( relative, direction ) );
+            c = kf_fixed_sub( kf_vec3_length_squared( relative ), radius_squared );
+            root_count = kf_quadratic_roots( a, b, c, roots );
+            if( root_count != 0 ) kf_consider_capsule_root( roots[0], length, a, b, 0, 0, 0, 0, &found, &selected );
+        }
+    }
+
+    if( found == 0 ) return 0;
+    if( hit != NULL )
+    {
+        kf_fixed_t closest_y;
+        kf_vec3_t closest;
+        memset( hit, 0, sizeof( *hit ) );
+        hit->object_id = object_id;
+        hit->distance = selected;
+        hit->fraction = kf_fixed_div( selected, length );
+        hit->position = kf_vec3_add( sphere->position, kf_vec3_mul( direction, selected ) );
+        closest_y = kf_fixed_clamp( hit->position.y, segment_minimum_y, segment_maximum_y );
+        closest = (kf_vec3_t){capsule->position.x, closest_y, capsule->position.z};
+        hit->normal = kf_vec3_normalize( kf_vec3_sub( hit->position, closest ) );
+        if( kf_vec3_length_squared( hit->normal ) == 0 ) hit->normal = kf_vec3_mul( direction, -KF_FIXED_SCALE );
+        hit->started_inside = (uint8_t)(selected == 0 && kf_overlap_sphere_capsule( sphere, capsule ) != 0);
+    }
+    return 1;
+}
+
+int kf_raycast_capsule( const kf_ray_t * ray, const kf_capsule_t * capsule, uint32_t object_id, kf_hit_t * hit )
+{
+    kf_vec3_t direction;
+    kf_sphere_t point;
+    if( ray == NULL || ray->maximum_distance <= 0 || kf_capsule_valid( capsule ) == 0 ) return 0;
+    direction = kf_vec3_normalize( ray->direction );
+    if( kf_vec3_length_squared( direction ) == 0 ) return 0;
+    point.position = ray->origin;
+    point.radius = 0;
+    return kf_sweep_sphere_capsule( &point, kf_vec3_mul( direction, ray->maximum_distance ), capsule, object_id, hit );
+}
+
+int kf_sweep_capsule_aabb( const kf_capsule_t * capsule, kf_vec3_t displacement, const kf_aabb_t * box, kf_hit_t * hit )
+{
+    kf_fixed_t minimum[3];
+    kf_fixed_t maximum[3];
+    int result;
+    if( box == NULL || kf_capsule_valid( capsule ) == 0 ) return 0;
+    minimum[0] = kf_fixed_sub( box->minimum[0], capsule->radius );
+    minimum[1] = kf_fixed_sub( box->minimum[1], capsule->height );
+    minimum[2] = kf_fixed_sub( box->minimum[2], capsule->radius );
+    maximum[0] = kf_fixed_add( box->maximum[0], capsule->radius );
+    maximum[1] = box->maximum[1];
+    maximum[2] = kf_fixed_add( box->maximum[2], capsule->radius );
+    result = kf_sweep_point_bounds( capsule->position, displacement, minimum, maximum, box->id, hit );
+    if( result != 0 && hit != NULL ) hit->distance = kf_fixed_mul( kf_vec3_length( displacement ), hit->fraction );
+    return result;
+}
+
+int kf_world_sweep_capsule( const kf_aabb_t * boxes, size_t count, const kf_capsule_t * capsule,
+    kf_vec3_t displacement, kf_hit_t * hit )
+{
+    size_t index;
+    int found = 0;
+    kf_hit_t selected;
+    for( index = 0; index != count; ++index )
+    {
+        kf_hit_t candidate;
+        if( kf_sweep_capsule_aabb( capsule, displacement, boxes + index, &candidate ) == 0 ) continue;
+        if( kf_hit_precedes( &candidate, &selected, found ) != 0 )
+        {
+            selected = candidate;
+            found = 1;
+        }
+    }
+    if( found != 0 && hit != NULL ) *hit = selected;
+    return found;
+}
+
 int kf_aabb_overlaps_character( const kf_aabb_t * box, kf_vec3_t position, kf_fixed_t half_width, kf_fixed_t height )
 {
-    return kf_fixed_add( position.x, half_width ) > box->minimum[0] && kf_fixed_sub( position.x, half_width ) < box->maximum[0] &&
-        kf_fixed_add( position.y, height ) > box->minimum[1] && position.y < box->maximum[1] &&
-        kf_fixed_add( position.z, half_width ) > box->minimum[2] && kf_fixed_sub( position.z, half_width ) < box->maximum[2];
+    const kf_capsule_t capsule = {position, half_width, height};
+    return kf_overlap_capsule_aabb( &capsule, box );
 }
 
 int kf_world_character_collides( const kf_aabb_t * boxes, size_t count, kf_vec3_t position, kf_fixed_t half_width, kf_fixed_t height )
 {
-    size_t index;
-    for( index = 0; index != count; ++index )
-    {
-        if( kf_aabb_overlaps_character( boxes + index, position, half_width, height ) != 0 ) return 1;
-    }
-    return 0;
+    const kf_capsule_t capsule = {position, half_width, height};
+    return kf_world_overlap_capsule( boxes, count, &capsule, NULL );
 }
 
 int kf_world_find_step_top( const kf_aabb_t * boxes, size_t count, kf_vec3_t candidate,
@@ -539,105 +960,104 @@ int kf_world_find_step_top( const kf_aabb_t * boxes, size_t count, kf_vec3_t can
 
 int kf_sweep_sphere_aabb( kf_vec3_t start, kf_vec3_t end, kf_fixed_t radius, const kf_aabb_t * box, kf_fixed_t * hit_time )
 {
-    const kf_vec3_t delta = kf_vec3_sub( end, start );
-    const kf_fixed_t origins[3] = {start.x, start.y, start.z};
-    const kf_fixed_t deltas[3] = {delta.x, delta.y, delta.z};
-    kf_fixed_t entry = 0;
-    kf_fixed_t exit = KF_FIXED_SCALE;
-    const kf_fixed_t epsilon = kf_fixed_from_decimal( "0.000001" );
-    size_t axis;
-    for( axis = 0; axis != 3; ++axis )
-    {
-        const kf_fixed_t minimum = kf_fixed_sub( box->minimum[axis], radius );
-        const kf_fixed_t maximum = kf_fixed_add( box->maximum[axis], radius );
-        kf_fixed_t first;
-        kf_fixed_t second;
-        if( kf_fixed_abs( deltas[axis] ) <= epsilon )
-        {
-            if( origins[axis] < minimum || origins[axis] > maximum ) return 0;
-            continue;
-        }
-        first = kf_fixed_div( kf_fixed_sub( minimum, origins[axis] ), deltas[axis] );
-        second = kf_fixed_div( kf_fixed_sub( maximum, origins[axis] ), deltas[axis] );
-        if( first > second )
-        {
-            const kf_fixed_t temporary = first;
-            first = second;
-            second = temporary;
-        }
-        entry = kf_fixed_max( entry, first );
-        exit = kf_fixed_min( exit, second );
-        if( entry > exit ) return 0;
-    }
-    if( exit <= 0 || entry > KF_FIXED_SCALE ) return 0;
-    if( hit_time != NULL ) *hit_time = kf_fixed_clamp( entry, 0, KF_FIXED_SCALE );
-    return 1;
+    const kf_sphere_t sphere = {start, radius};
+    kf_hit_t hit;
+    const int result = kf_sweep_sphere_aabb_hit( &sphere, kf_vec3_sub( end, start ), box, &hit );
+    if( result != 0 && hit_time != NULL ) *hit_time = hit.fraction;
+    return result;
 }
 
 int kf_world_sweep_sphere( const kf_aabb_t * boxes, size_t count, kf_vec3_t start, kf_vec3_t end,
     kf_fixed_t radius, kf_fixed_t * hit_time, uint32_t * brush_id )
 {
-    size_t index;
-    int hit = 0;
-    kf_fixed_t selected_time = KF_FIXED_SCALE;
-    uint32_t selected_id = UINT32_MAX;
-    for( index = 0; index != count; ++index )
+    const kf_sphere_t sphere = {start, radius};
+    kf_hit_t hit;
+    const int result = kf_world_sweep_sphere_hit( boxes, count, &sphere, kf_vec3_sub( end, start ), &hit );
+    if( result != 0 )
     {
-        kf_fixed_t current_time;
-        if( kf_sweep_sphere_aabb( start, end, radius, boxes + index, &current_time ) == 0 ) continue;
-        if( hit == 0 || current_time < selected_time || (current_time == selected_time && boxes[index].id < selected_id) )
-        {
-            hit = 1;
-            selected_time = current_time;
-            selected_id = boxes[index].id;
-        }
+        if( hit_time != NULL ) *hit_time = hit.fraction;
+        if( brush_id != NULL ) *brush_id = hit.object_id;
     }
-    if( hit != 0 )
-    {
-        if( hit_time != NULL ) *hit_time = selected_time;
-        if( brush_id != NULL ) *brush_id = selected_id;
-    }
-    return hit;
+    return result;
 }
 
 int kf_world_line_blocked( const kf_aabb_t * boxes, size_t count, kf_vec3_t start, kf_vec3_t end,
     kf_fixed_t minimum_time, kf_fixed_t maximum_time )
 {
+    const kf_vec3_t delta = kf_vec3_sub( end, start );
+    const kf_fixed_t length = kf_vec3_length( delta );
+    const kf_ray_t ray = {start, delta, length};
+    kf_hit_t hit;
+    if( length == 0 || kf_world_raycast( boxes, count, &ray, &hit ) == 0 ) return 0;
+    return hit.fraction > minimum_time && hit.fraction < maximum_time;
+}
+
+static const kf_aabb_t * kf_world_find_box( const kf_aabb_t * boxes, size_t count, uint32_t id )
+{
     size_t index;
-    for( index = 0; index != count; ++index )
-    {
-        kf_fixed_t hit_time;
-        if( kf_sweep_sphere_aabb( start, end, 0, boxes + index, &hit_time ) != 0 &&
-            hit_time > minimum_time && hit_time < maximum_time ) return 1;
-    }
-    return 0;
+    for( index = 0; index != count; ++index ) if( boxes[index].id == id ) return boxes + index;
+    return NULL;
+}
+
+static kf_fixed_t kf_character_safe_fraction( kf_fixed_t fraction, kf_fixed_t distance, kf_fixed_t skin )
+{
+    kf_fixed_t margin;
+    if( fraction <= 0 || distance <= 0 || skin <= 0 ) return kf_fixed_max( fraction, 0 );
+    margin = kf_fixed_div( skin, distance );
+    return kf_fixed_max( 0, kf_fixed_sub( fraction, margin ) );
+}
+
+static int kf_character_try_step( kf_character_body_t * body, const kf_character_config_t * config,
+    const kf_aabb_t * boxes, size_t count, kf_vec3_t displacement, const kf_hit_t * blocking_hit )
+{
+    const kf_aabb_t * step = kf_world_find_box( boxes, count, blocking_hit->object_id );
+    kf_capsule_t capsule;
+    kf_vec3_t rise;
+    kf_hit_t hit;
+    kf_fixed_t step_height;
+    if( step == NULL || body->grounded == 0 ) return 0;
+    step_height = kf_fixed_sub( step->maximum[1], body->position.y );
+    if( step_height <= 0 || step_height > config->step_height ) return 0;
+
+    capsule.position = body->position;
+    capsule.radius = config->radius;
+    capsule.height = config->height;
+    rise = (kf_vec3_t){0, step_height, 0};
+    if( kf_world_sweep_capsule( boxes, count, &capsule, rise, &hit ) != 0 && hit.object_id != step->id ) return 0;
+    capsule.position = kf_vec3_add( capsule.position, rise );
+    if( kf_world_overlap_capsule( boxes, count, &capsule, NULL ) != 0 ) return 0;
+    if( kf_world_sweep_capsule( boxes, count, &capsule, displacement, &hit ) != 0 ) return 0;
+    body->position = kf_vec3_add( capsule.position, displacement );
+    return 1;
 }
 
 static void kf_character_move_horizontal( kf_character_body_t * body, const kf_character_config_t * config,
     const kf_aabb_t * boxes, size_t count, kf_fixed_t delta, int x_axis, kf_character_result_t * result )
 {
-    kf_vec3_t candidate;
-    kf_fixed_t step_top;
+    kf_capsule_t capsule;
+    kf_vec3_t displacement = {0, 0, 0};
+    kf_hit_t hit;
+    kf_fixed_t fraction;
     if( delta == 0 ) return;
-    candidate = body->position;
-    if( x_axis != 0 ) candidate.x = kf_fixed_add( candidate.x, delta );
-    else candidate.z = kf_fixed_add( candidate.z, delta );
-    if( kf_world_character_collides( boxes, count, candidate, config->half_width, config->height ) == 0 )
+    if( x_axis != 0 ) displacement.x = delta;
+    else displacement.z = delta;
+    capsule.position = body->position;
+    capsule.radius = config->radius;
+    capsule.height = config->height;
+    if( kf_world_sweep_capsule( boxes, count, &capsule, displacement, &hit ) == 0 )
     {
-        body->position = candidate;
+        body->position = kf_vec3_add( body->position, displacement );
         return;
     }
-    if( body->grounded != 0 && kf_world_find_step_top( boxes, count, candidate, config->half_width, config->height,
-        body->position.y, config->step_height, &step_top ) != 0 )
+    if( kf_character_try_step( body, config, boxes, count, displacement, &hit ) != 0 )
     {
-        candidate.y = step_top;
-        if( kf_world_character_collides( boxes, count, candidate, config->half_width, config->height ) == 0 )
-        {
-            body->position = candidate;
-            result->stepped = 1;
-            return;
-        }
+        result->stepped = 1;
+        return;
     }
+    fraction = kf_character_safe_fraction( hit.fraction, kf_fixed_abs( delta ), config->support_epsilon );
+    body->position = kf_vec3_add( body->position, kf_vec3_mul( displacement, fraction ) );
+    if( result->blocked == 0 ) result->hit = hit;
+    result->blocked = 1;
     if( x_axis != 0 ) body->velocity.x = 0;
     else body->velocity.z = 0;
 }
@@ -646,11 +1066,12 @@ void kf_character_step( kf_character_body_t * body, const kf_character_config_t 
     const kf_aabb_t * boxes, size_t count, kf_character_result_t * result )
 {
     kf_vec3_t displacement;
-    kf_vec3_t vertical_candidate;
-    kf_fixed_t resolved_y;
-    int vertical_collision = 0;
-    size_t index;
+    kf_capsule_t capsule;
+    kf_vec3_t vertical_displacement;
+    kf_hit_t vertical_hit;
+    kf_fixed_t boundary;
     memset( result, 0, sizeof( *result ) );
+    if( body == NULL || config == NULL || kf_capsule_valid( &(kf_capsule_t){body->position, config->radius, config->height} ) == 0 ) return;
     if( body->grounded == 0 )
     {
         body->velocity.y = kf_fixed_sub( body->velocity.y, kf_fixed_mul( config->gravity, config->tick_seconds ) );
@@ -660,32 +1081,34 @@ void kf_character_step( kf_character_body_t * body, const kf_character_config_t 
     kf_character_move_horizontal( body, config, boxes, count, displacement.x, 1, result );
     kf_character_move_horizontal( body, config, boxes, count, displacement.z, 0, result );
 
-    vertical_candidate = body->position;
-    vertical_candidate.y = kf_fixed_add( vertical_candidate.y, displacement.y );
-    resolved_y = vertical_candidate.y;
-    for( index = 0; index != count; ++index )
+    capsule.position = body->position;
+    capsule.radius = config->radius;
+    capsule.height = config->height;
+    vertical_displacement = (kf_vec3_t){0, displacement.y, 0};
+    if( displacement.y != 0 && kf_world_sweep_capsule( boxes, count, &capsule, vertical_displacement, &vertical_hit ) != 0 )
     {
-        if( kf_aabb_overlaps_character( boxes + index, vertical_candidate, config->half_width, config->height ) == 0 ) continue;
-        vertical_collision = 1;
-        if( displacement.y <= 0 ) resolved_y = kf_fixed_max( resolved_y, boxes[index].maximum[1] );
-        else resolved_y = kf_fixed_min( resolved_y, kf_fixed_sub( boxes[index].minimum[1], config->height ) );
-    }
-    body->position.y = resolved_y;
-    if( vertical_collision != 0 )
-    {
-        result->landed = body->grounded == 0 && displacement.y <= 0;
+        body->position = kf_vec3_add( body->position, kf_vec3_mul( vertical_displacement, vertical_hit.fraction ) );
+        result->landed = body->grounded == 0 && displacement.y < 0;
         result->hit_ceiling = displacement.y > 0;
+        if( result->blocked == 0 ) result->hit = vertical_hit;
+        result->blocked = 1;
         body->velocity.y = 0;
-        body->grounded = displacement.y <= 0;
+        body->grounded = displacement.y < 0;
     }
     else
     {
-        kf_vec3_t support_probe = body->position;
-        support_probe.y = kf_fixed_sub( support_probe.y, config->support_epsilon );
-        body->grounded = (uint8_t)kf_world_character_collides( boxes, count, support_probe, config->half_width, config->height );
+        kf_capsule_t support;
+        body->position = kf_vec3_add( body->position, vertical_displacement );
+        support.position = body->position;
+        support.position.y = kf_fixed_sub( support.position.y, config->support_epsilon );
+        support.radius = config->radius;
+        support.height = config->height;
+        body->grounded = (uint8_t)kf_world_overlap_capsule( boxes, count, &support, NULL );
     }
-    if( body->position.x < -config->arena_half_extent ) { body->position.x = -config->arena_half_extent; body->velocity.x = 0; }
-    if( body->position.x > config->arena_half_extent ) { body->position.x = config->arena_half_extent; body->velocity.x = 0; }
-    if( body->position.z < -config->arena_half_extent ) { body->position.z = -config->arena_half_extent; body->velocity.z = 0; }
-    if( body->position.z > config->arena_half_extent ) { body->position.z = config->arena_half_extent; body->velocity.z = 0; }
+
+    boundary = kf_fixed_sub( config->arena_half_extent, config->radius );
+    if( body->position.x < -boundary ) { body->position.x = -boundary; body->velocity.x = 0; }
+    if( body->position.x > boundary ) { body->position.x = boundary; body->velocity.x = 0; }
+    if( body->position.z < -boundary ) { body->position.z = -boundary; body->velocity.z = 0; }
+    if( body->position.z > boundary ) { body->position.z = boundary; body->velocity.z = 0; }
 }
