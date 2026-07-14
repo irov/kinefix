@@ -6,6 +6,13 @@ It provides signed Q32.32 arithmetic, fixed-point vector/trigonometric operation
 PCG32 random streams, and deterministic collision queries. Authoritative functions
 do not call the system floating-point math library.
 
+Angles can be stored as binary turns: `kf_angle16_t` maps one full revolution to
+the complete `uint16_t` range, so yaw wraps naturally. `kf_sangle16_t` represents
+signed angular deltas and clamped pitch. Sine and cosine use an 8 KiB Q32.32
+quarter-wave lookup table with deterministic integer interpolation; cosine is a
+quarter-turn phase shift. Radian conversion and the older Q32.32 trigonometry API
+remain available for compatibility.
+
 Collision primitives and queries include:
 
 - AABB, sphere, ray, and Y-up capsule shapes;

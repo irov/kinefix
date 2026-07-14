@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 #define KF_VERSION_MAJOR 1
-#define KF_VERSION_MINOR 1
+#define KF_VERSION_MINOR 2
 #define KF_VERSION_PATCH 0
 
 #define KF_FIXED_FRACTION_BITS 32
@@ -18,7 +18,14 @@ extern "C" {
 #define KF_FIXED_HALF_PI INT64_C(6746518852)
 #define KF_FIXED_TWO_PI INT64_C(26986075409)
 
+#define KF_ANGLE16_TURN UINT32_C(65536)
+#define KF_ANGLE16_QUARTER UINT16_C(16384)
+#define KF_ANGLE16_HALF UINT16_C(32768)
+#define KF_ANGLE16_THREE_QUARTERS UINT16_C(49152)
+
 typedef int64_t kf_fixed_t;
+typedef uint16_t kf_angle16_t;
+typedef int16_t kf_sangle16_t;
 typedef uint8_t kf_fault_code_t;
 
 #define KF_FAULT_NONE UINT8_C(0)
@@ -135,6 +142,16 @@ kf_fixed_t kf_fixed_clamp( kf_fixed_t value, kf_fixed_t minimum, kf_fixed_t maxi
 kf_fixed_t kf_fixed_sqrt( kf_fixed_t value );
 kf_fixed_t kf_fixed_wrap_angle( kf_fixed_t angle );
 void kf_fixed_sin_cos( kf_fixed_t angle, kf_fixed_t * sine, kf_fixed_t * cosine );
+
+kf_angle16_t kf_angle16_from_fixed_radians( kf_fixed_t radians );
+kf_sangle16_t kf_sangle16_from_fixed_radians( kf_fixed_t radians );
+kf_fixed_t kf_angle16_to_fixed_radians( kf_angle16_t angle );
+kf_fixed_t kf_sangle16_to_fixed_radians( kf_sangle16_t angle );
+kf_angle16_t kf_angle16_add( kf_angle16_t angle, kf_sangle16_t delta );
+kf_sangle16_t kf_sangle16_add_clamped( kf_sangle16_t angle, kf_sangle16_t delta,
+    kf_sangle16_t minimum, kf_sangle16_t maximum );
+void kf_angle16_sin_cos( kf_angle16_t angle, kf_fixed_t * sine, kf_fixed_t * cosine );
+void kf_sangle16_sin_cos( kf_sangle16_t angle, kf_fixed_t * sine, kf_fixed_t * cosine );
 
 kf_vec3_t kf_vec3_add( kf_vec3_t left, kf_vec3_t right );
 kf_vec3_t kf_vec3_sub( kf_vec3_t left, kf_vec3_t right );

@@ -15,6 +15,11 @@
 
 static KF_THREAD_LOCAL kf_fault_t * g_kf_fault = NULL;
 
+static const kf_fixed_t g_kf_sine_quarter_q32[1025] =
+{
+#include "kinefix_sine_quarter_q32.inc"
+};
+
 static void kf_raise_bound( kf_fault_code_t code, const char * operation )
 {
     if( g_kf_fault != NULL )
@@ -354,45 +359,98 @@ kf_fixed_t kf_fixed_sqrt( kf_fixed_t value )
 
 kf_fixed_t kf_fixed_wrap_angle( kf_fixed_t angle )
 {
-    while( angle > KF_FIXED_PI ) angle = kf_fixed_sub( angle, KF_FIXED_TWO_PI );
-    while( angle < -KF_FIXED_PI ) angle = kf_fixed_add( angle, KF_FIXED_TWO_PI );
+    angle %= KF_FIXED_TWO_PI;
+    if( angle > KF_FIXED_PI ) angle = kf_fixed_sub( angle, KF_FIXED_TWO_PI );
+    if( angle < -KF_FIXED_PI ) angle = kf_fixed_add( angle, KF_FIXED_TWO_PI );
     return angle;
+}
+
+static int64_t kf_divide_round_nearest( int64_t numerator, int64_t denominator )
+{
+    const int negative = numerator < 0;
+    const uint64_t magnitude = kf_magnitude( numerator );
+    const uint64_t rounded = (magnitude + (uint64_t)denominator / UINT64_C(2)) / (uint64_t)denominator;
+    return negative != 0 ? -(int64_t)rounded : (int64_t)rounded;
+}
+
+kf_angle16_t kf_angle16_from_fixed_radians( kf_fixed_t radians )
+{
+    const int64_t wrapped = radians % KF_FIXED_TWO_PI;
+    const int64_t scaled = wrapped * (int64_t)KF_ANGLE16_TURN;
+    const int64_t ticks = kf_divide_round_nearest( scaled, KF_FIXED_TWO_PI );
+    return (kf_angle16_t)ticks;
+}
+
+kf_sangle16_t kf_sangle16_from_fixed_radians( kf_fixed_t radians )
+{
+    const kf_angle16_t wrapped = kf_angle16_from_fixed_radians( radians );
+    if( wrapped <= (kf_angle16_t)INT16_MAX ) return (kf_sangle16_t)wrapped;
+    return (kf_sangle16_t)((int32_t)wrapped - (int32_t)KF_ANGLE16_TURN);
+}
+
+kf_fixed_t kf_angle16_to_fixed_radians( kf_angle16_t angle )
+{
+    return ((int64_t)angle * KF_FIXED_TWO_PI) / (int64_t)KF_ANGLE16_TURN;
+}
+
+kf_fixed_t kf_sangle16_to_fixed_radians( kf_sangle16_t angle )
+{
+    return ((int64_t)angle * KF_FIXED_TWO_PI) / (int64_t)KF_ANGLE16_TURN;
+}
+
+kf_angle16_t kf_angle16_add( kf_angle16_t angle, kf_sangle16_t delta )
+{
+    return (kf_angle16_t)((int32_t)angle + (int32_t)delta);
+}
+
+kf_sangle16_t kf_sangle16_add_clamped( kf_sangle16_t angle, kf_sangle16_t delta,
+    kf_sangle16_t minimum, kf_sangle16_t maximum )
+{
+    int32_t result;
+    if( minimum > maximum )
+    {
+        kf_raise_bound( KF_FAULT_INVALID_CONFIGURATION, "sangle16_clamp" );
+        return angle;
+    }
+    result = (int32_t)angle + (int32_t)delta;
+    if( result < (int32_t)minimum ) result = minimum;
+    if( result > (int32_t)maximum ) result = maximum;
+    return (kf_sangle16_t)result;
+}
+
+static kf_fixed_t kf_angle16_sine( kf_angle16_t angle )
+{
+    const uint32_t quadrant = (uint32_t)angle >> 14;
+    const uint32_t within_quadrant = (uint32_t)angle & UINT32_C(0x3FFF);
+    const int negative = quadrant >= 2u;
+    const uint32_t offset = (quadrant == 1u || quadrant == 3u)
+        ? (uint32_t)KF_ANGLE16_QUARTER - within_quadrant
+        : within_quadrant;
+    const uint32_t index = offset >> 4;
+    const uint32_t fraction = offset & UINT32_C(15);
+    kf_fixed_t value = g_kf_sine_quarter_q32[index];
+    if( fraction != 0u )
+    {
+        const kf_fixed_t difference = g_kf_sine_quarter_q32[index + 1u] - value;
+        value += (difference * (kf_fixed_t)fraction) / INT64_C(16);
+    }
+    return negative != 0 ? -value : value;
+}
+
+void kf_angle16_sin_cos( kf_angle16_t angle, kf_fixed_t * sine, kf_fixed_t * cosine )
+{
+    if( sine != NULL ) *sine = kf_angle16_sine( angle );
+    if( cosine != NULL ) *cosine = kf_angle16_sine( (kf_angle16_t)(angle + KF_ANGLE16_QUARTER) );
+}
+
+void kf_sangle16_sin_cos( kf_sangle16_t angle, kf_fixed_t * sine, kf_fixed_t * cosine )
+{
+    kf_angle16_sin_cos( (kf_angle16_t)angle, sine, cosine );
 }
 
 void kf_fixed_sin_cos( kf_fixed_t angle, kf_fixed_t * sine, kf_fixed_t * cosine )
 {
-    kf_fixed_t x = kf_fixed_wrap_angle( angle );
-    int cosine_negative = 0;
-    kf_fixed_t x2;
-    kf_fixed_t sin_polynomial;
-    kf_fixed_t cos_polynomial;
-    const kf_fixed_t sin_c1 = kf_fixed_from_decimal( "-0.166666666666666666" );
-    const kf_fixed_t sin_c2 = kf_fixed_from_decimal( "0.008333333333333333" );
-    const kf_fixed_t sin_c3 = kf_fixed_from_decimal( "-0.000198412698412698" );
-    const kf_fixed_t sin_c4 = kf_fixed_from_decimal( "0.000002755731922398" );
-    const kf_fixed_t cos_c1 = kf_fixed_from_decimal( "-0.5" );
-    const kf_fixed_t cos_c2 = kf_fixed_from_decimal( "0.041666666666666666" );
-    const kf_fixed_t cos_c3 = kf_fixed_from_decimal( "-0.001388888888888888" );
-    const kf_fixed_t cos_c4 = kf_fixed_from_decimal( "0.000024801587301587" );
-    if( x > KF_FIXED_HALF_PI )
-    {
-        x = kf_fixed_sub( KF_FIXED_PI, x );
-        cosine_negative = 1;
-    }
-    else if( x < -KF_FIXED_HALF_PI )
-    {
-        x = kf_fixed_sub( -KF_FIXED_PI, x );
-        cosine_negative = 1;
-    }
-    x2 = kf_fixed_mul( x, x );
-    sin_polynomial = kf_fixed_add( KF_FIXED_SCALE, kf_fixed_mul( x2,
-        kf_fixed_add( sin_c1, kf_fixed_mul( x2, kf_fixed_add( sin_c2,
-        kf_fixed_mul( x2, kf_fixed_add( sin_c3, kf_fixed_mul( x2, sin_c4 ) ) ) ) ) ) ) );
-    cos_polynomial = kf_fixed_add( KF_FIXED_SCALE, kf_fixed_mul( x2,
-        kf_fixed_add( cos_c1, kf_fixed_mul( x2, kf_fixed_add( cos_c2,
-        kf_fixed_mul( x2, kf_fixed_add( cos_c3, kf_fixed_mul( x2, cos_c4 ) ) ) ) ) ) ) );
-    if( sine != NULL ) *sine = kf_fixed_mul( x, sin_polynomial );
-    if( cosine != NULL ) *cosine = cosine_negative != 0 ? kf_fixed_neg( cos_polynomial ) : cos_polynomial;
+    kf_angle16_sin_cos( kf_angle16_from_fixed_radians( angle ), sine, cosine );
 }
 
 kf_vec3_t kf_vec3_add( kf_vec3_t left, kf_vec3_t right )

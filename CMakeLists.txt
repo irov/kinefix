@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(kinefix VERSION 1.0.0 LANGUAGES C)
+project(kinefix VERSION 1.2.0 LANGUAGES C)
 
 option(KINEFIX_BUILD_TESTS "Build kinefix tests" OFF)
 option(KINEFIX_INSTALL "Install kinefix" OFF)

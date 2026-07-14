@@ -34,6 +34,31 @@ int main( void )
     CHECK( kf_fixed_sqrt( kf_fixed_from_int( 9 ) ) == kf_fixed_from_int( 3 ) );
     kf_fixed_sin_cos( KF_FIXED_PI / 4, &sine, &cosine );
     CHECK( kf_fixed_abs( kf_fixed_sub( sine, cosine ) ) < 50000 );
+    CHECK( kf_angle16_from_fixed_radians( 0 ) == 0u );
+    CHECK( kf_angle16_from_fixed_radians( KF_FIXED_HALF_PI ) == KF_ANGLE16_QUARTER );
+    CHECK( kf_angle16_from_fixed_radians( KF_FIXED_PI ) == KF_ANGLE16_HALF );
+    CHECK( kf_angle16_from_fixed_radians( KF_FIXED_TWO_PI ) == 0u );
+    CHECK( kf_sangle16_from_fixed_radians( -KF_FIXED_HALF_PI ) == -INT16_C(16384) );
+    CHECK( kf_angle16_to_fixed_radians( KF_ANGLE16_HALF ) == KF_FIXED_PI );
+    CHECK( kf_sangle16_to_fixed_radians( -INT16_C(16384) ) == -KF_FIXED_HALF_PI );
+    CHECK( kf_angle16_add( UINT16_C(65530), INT16_C(10) ) == UINT16_C(4) );
+    CHECK( kf_sangle16_add_clamped( INT16_C(16000), INT16_C(1000), -INT16_C(16202), INT16_C(16202) ) == INT16_C(16202) );
+    kf_angle16_sin_cos( 0u, &sine, &cosine );
+    CHECK( sine == 0 && cosine == KF_FIXED_SCALE );
+    kf_angle16_sin_cos( KF_ANGLE16_QUARTER, &sine, &cosine );
+    CHECK( sine == KF_FIXED_SCALE && cosine == 0 );
+    kf_angle16_sin_cos( KF_ANGLE16_HALF, &sine, &cosine );
+    CHECK( sine == 0 && cosine == -KF_FIXED_SCALE );
+    kf_angle16_sin_cos( UINT16_C(8192), &sine, &cosine );
+    CHECK( sine == cosine );
+    CHECK( kf_fixed_abs( kf_fixed_sub( sine, INT64_C(3037000499) ) ) < INT64_C(8) );
+    for( index = 0; index < KF_ANGLE16_TURN; index += 257u )
+    {
+        kf_fixed_t unit_length;
+        kf_angle16_sin_cos( (kf_angle16_t)index, &sine, &cosine );
+        unit_length = kf_fixed_add( kf_fixed_mul( sine, sine ), kf_fixed_mul( cosine, cosine ) );
+        CHECK( kf_fixed_abs( kf_fixed_sub( unit_length, KF_FIXED_SCALE ) ) < INT64_C(13000) );
+    }
     CHECK( kf_fault_failed( &fault ) == 0 );
 
     kf_pcg32_seed( &first, 42, 54 );
