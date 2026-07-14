@@ -1,0 +1,5 @@
+/build/
+/solutions/
+/.vs/
+*.user
+*.DS_Store
