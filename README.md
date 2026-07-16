@@ -2,16 +2,25 @@
 
 `kinefix` is a small deterministic math and collision library written in ISO C11.
 
-It provides signed Q32.32 arithmetic, fixed-point vector/trigonometric operations,
+It provides signed Q16.16 arithmetic, fixed-point vector/trigonometric operations,
 PCG32 random streams, and deterministic collision queries. Authoritative functions
 do not call the system floating-point math library.
 
 Angles can be stored as binary turns: `kf_angle16_t` maps one full revolution to
 the complete `uint16_t` range, so yaw wraps naturally. `kf_sangle16_t` represents
-signed angular deltas and clamped pitch. Sine and cosine use an 8 KiB Q32.32
+signed angular deltas and clamped pitch. Sine and cosine use a 4 KiB Q16.16
 quarter-wave lookup table with deterministic integer interpolation; cosine is a
-quarter-turn phase shift. Radian conversion and the older Q32.32 trigonometry API
-remain available for compatibility.
+quarter-turn phase shift. Products and accumulated vector terms remain signed
+Q32.32 until the outer Q16.16 result boundary. Fused multiply-add, projection,
+hit-position, and sweep formulas do not narrow their intermediate terms.
+Quadratic sweep coefficients remain Q32.32, while their Q64.64 discriminant uses
+an unsigned 128-bit backend with a portable two-limb implementation for MSVC.
+Public fixed values remain 32-bit.
+
+`kf_fixed_from_float` is a convenience conversion for tests, tools, and other
+non-authoritative boundaries. It truncates toward zero. Authoritative constants
+should be stored as raw Q16.16 values or generated from decimal source data at
+content-build time.
 
 Collision primitives and queries include:
 
@@ -37,5 +46,5 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-The public API is declared in `include/kinefix/kinefix.h` and is usable from both C
-and C++ through `extern "C"` guards.
+The pure C API is declared in `include/kinefix/kinefix.h`. C++ consumers include
+`include/kinefix/kinefix.hpp`, which provides the `extern "C"` linkage wrapper.

@@ -4,42 +4,38 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
+#if !defined(KF_FORCE_INLINE)
+#   if defined(_MSC_VER)
+#       define KF_FORCE_INLINE static __forceinline
+#   elif defined(__GNUC__) || defined(__clang__)
+#       define KF_FORCE_INLINE static inline __attribute__((__always_inline__))
+#   else
+#       define KF_FORCE_INLINE static inline
+#   endif
 #endif
 
 #define KF_VERSION_MAJOR 1
-#define KF_VERSION_MINOR 2
+#define KF_VERSION_MINOR 3
 #define KF_VERSION_PATCH 0
 
-#define KF_FIXED_FRACTION_BITS 32
-#define KF_FIXED_SCALE INT64_C(4294967296)
-#define KF_FIXED_PI INT64_C(13493037704)
-#define KF_FIXED_HALF_PI INT64_C(6746518852)
-#define KF_FIXED_TWO_PI INT64_C(26986075409)
+#define KF_FIXED_FRACTION_BITS 16
+#define KF_FIXED_SCALE INT32_C(65536)
+#define KF_FIXED_PI INT32_C(205887)
+#define KF_FIXED_HALF_PI INT32_C(102943)
+#define KF_FIXED_TWO_PI INT32_C(411774)
 
 #define KF_ANGLE16_TURN UINT32_C(65536)
 #define KF_ANGLE16_QUARTER UINT16_C(16384)
 #define KF_ANGLE16_HALF UINT16_C(32768)
 #define KF_ANGLE16_THREE_QUARTERS UINT16_C(49152)
 
-typedef int64_t kf_fixed_t;
+typedef int32_t kf_fixed_t;
 typedef uint16_t kf_angle16_t;
 typedef int16_t kf_sangle16_t;
-typedef uint8_t kf_fault_code_t;
+typedef uint8_t kf_bool_t;
 
-#define KF_FAULT_NONE UINT8_C(0)
-#define KF_FAULT_OVERFLOW UINT8_C(1)
-#define KF_FAULT_DIVISION_BY_ZERO UINT8_C(2)
-#define KF_FAULT_INVALID_SQUARE_ROOT UINT8_C(3)
-#define KF_FAULT_INVALID_CONFIGURATION UINT8_C(4)
-#define KF_FAULT_INVALID_SNAPSHOT UINT8_C(5)
-
-typedef struct kf_fault_t
-{
-    kf_fault_code_t code;
-    const char * operation;
-} kf_fault_t;
+#define KF_FALSE ((kf_bool_t)0)
+#define KF_TRUE ((kf_bool_t)1)
 
 typedef struct kf_vec3_t
 {
@@ -89,14 +85,14 @@ typedef struct kf_hit_t
     kf_fixed_t distance;
     kf_vec3_t position;
     kf_vec3_t normal;
-    uint8_t started_inside;
+    kf_bool_t started_inside;
 } kf_hit_t;
 
 typedef struct kf_character_body_t
 {
     kf_vec3_t position;
     kf_vec3_t velocity;
-    uint8_t grounded;
+    kf_bool_t grounded;
 } kf_character_body_t;
 
 typedef struct kf_character_config_t
@@ -114,31 +110,46 @@ typedef struct kf_character_result_t
 {
     kf_hit_t hit;
     kf_fixed_t previous_vertical_velocity;
-    uint8_t landed;
-    uint8_t hit_ceiling;
-    uint8_t stepped;
-    uint8_t blocked;
+    kf_bool_t landed;
+    kf_bool_t hit_ceiling;
+    kf_bool_t stepped;
+    kf_bool_t blocked;
 } kf_character_result_t;
 
-void kf_fault_clear( kf_fault_t * fault );
-void kf_fault_raise( kf_fault_t * fault, kf_fault_code_t code, const char * operation );
-int kf_fault_failed( const kf_fault_t * fault );
-kf_fault_t * kf_fault_bind( kf_fault_t * fault );
-void kf_fault_restore( kf_fault_t * previous );
-
 kf_fixed_t kf_fixed_from_int( int64_t value );
-kf_fixed_t kf_fixed_from_decimal( const char * value );
-kf_fixed_t kf_fixed_from_decimal_n( const char * value, size_t size );
+kf_fixed_t kf_fixed_from_float( float value );
 double kf_fixed_to_double( kf_fixed_t value );
 kf_fixed_t kf_fixed_neg( kf_fixed_t value );
 kf_fixed_t kf_fixed_add( kf_fixed_t left, kf_fixed_t right );
 kf_fixed_t kf_fixed_sub( kf_fixed_t left, kf_fixed_t right );
 kf_fixed_t kf_fixed_mul( kf_fixed_t left, kf_fixed_t right );
 kf_fixed_t kf_fixed_div( kf_fixed_t left, kf_fixed_t right );
-kf_fixed_t kf_fixed_abs( kf_fixed_t value );
-kf_fixed_t kf_fixed_min( kf_fixed_t left, kf_fixed_t right );
-kf_fixed_t kf_fixed_max( kf_fixed_t left, kf_fixed_t right );
-kf_fixed_t kf_fixed_clamp( kf_fixed_t value, kf_fixed_t minimum, kf_fixed_t maximum );
+
+KF_FORCE_INLINE kf_fixed_t kf_fixed_abs( kf_fixed_t value )
+{
+    if( value == INT32_MIN )
+    {
+        return kf_fixed_neg( value );
+    }
+
+    return value < 0 ? -value : value;
+}
+
+KF_FORCE_INLINE kf_fixed_t kf_fixed_min( kf_fixed_t left, kf_fixed_t right )
+{
+    return left < right ? left : right;
+}
+
+KF_FORCE_INLINE kf_fixed_t kf_fixed_max( kf_fixed_t left, kf_fixed_t right )
+{
+    return left > right ? left : right;
+}
+
+KF_FORCE_INLINE kf_fixed_t kf_fixed_clamp( kf_fixed_t value, kf_fixed_t minimum, kf_fixed_t maximum )
+{
+    return kf_fixed_max( minimum, kf_fixed_min( maximum, value ) );
+}
+
 kf_fixed_t kf_fixed_sqrt( kf_fixed_t value );
 kf_fixed_t kf_fixed_wrap_angle( kf_fixed_t angle );
 void kf_fixed_sin_cos( kf_fixed_t angle, kf_fixed_t * sine, kf_fixed_t * cosine );
@@ -148,8 +159,7 @@ kf_sangle16_t kf_sangle16_from_fixed_radians( kf_fixed_t radians );
 kf_fixed_t kf_angle16_to_fixed_radians( kf_angle16_t angle );
 kf_fixed_t kf_sangle16_to_fixed_radians( kf_sangle16_t angle );
 kf_angle16_t kf_angle16_add( kf_angle16_t angle, kf_sangle16_t delta );
-kf_sangle16_t kf_sangle16_add_clamped( kf_sangle16_t angle, kf_sangle16_t delta,
-    kf_sangle16_t minimum, kf_sangle16_t maximum );
+kf_sangle16_t kf_sangle16_add_clamped( kf_sangle16_t angle, kf_sangle16_t delta, kf_sangle16_t minimum, kf_sangle16_t maximum );
 void kf_angle16_sin_cos( kf_angle16_t angle, kf_fixed_t * sine, kf_fixed_t * cosine );
 void kf_sangle16_sin_cos( kf_sangle16_t angle, kf_fixed_t * sine, kf_fixed_t * cosine );
 
@@ -170,39 +180,29 @@ uint32_t kf_pcg32_next( kf_pcg32_t * random );
 uint32_t kf_pcg32_bounded( kf_pcg32_t * random, uint32_t bound );
 void kf_pcg32_restore( kf_pcg32_t * random, uint64_t state, uint64_t stream );
 
-int kf_aabb_overlaps_character( const kf_aabb_t * box, kf_vec3_t position, kf_fixed_t half_width, kf_fixed_t height );
-int kf_world_character_collides( const kf_aabb_t * boxes, size_t count, kf_vec3_t position, kf_fixed_t half_width, kf_fixed_t height );
-int kf_world_find_step_top( const kf_aabb_t * boxes, size_t count, kf_vec3_t candidate,
-    kf_fixed_t half_width, kf_fixed_t height, kf_fixed_t current_y, kf_fixed_t maximum_step, kf_fixed_t * top );
+kf_bool_t kf_aabb_overlaps_character( const kf_aabb_t * box, kf_vec3_t position, kf_fixed_t half_width, kf_fixed_t height );
+kf_bool_t kf_world_character_collides( const kf_aabb_t * boxes, size_t count, kf_vec3_t position, kf_fixed_t half_width, kf_fixed_t height );
+kf_bool_t kf_world_find_step_top( const kf_aabb_t * boxes, size_t count, kf_vec3_t candidate, kf_fixed_t half_width, kf_fixed_t height, kf_fixed_t current_y, kf_fixed_t maximum_step, kf_fixed_t * top );
 
-int kf_overlap_aabb_aabb( const kf_aabb_t * left, const kf_aabb_t * right );
-int kf_overlap_sphere_aabb( const kf_sphere_t * sphere, const kf_aabb_t * box );
-int kf_overlap_capsule_aabb( const kf_capsule_t * capsule, const kf_aabb_t * box );
-int kf_overlap_sphere_capsule( const kf_sphere_t * sphere, const kf_capsule_t * capsule );
-int kf_world_overlap_capsule( const kf_aabb_t * boxes, size_t count, const kf_capsule_t * capsule, uint32_t * brush_id );
+kf_bool_t kf_overlap_aabb_aabb( const kf_aabb_t * left, const kf_aabb_t * right );
+kf_bool_t kf_overlap_sphere_aabb( const kf_sphere_t * sphere, const kf_aabb_t * box );
+kf_bool_t kf_overlap_capsule_aabb( const kf_capsule_t * capsule, const kf_aabb_t * box );
+kf_bool_t kf_overlap_sphere_capsule( const kf_sphere_t * sphere, const kf_capsule_t * capsule );
+kf_bool_t kf_overlap_capsule_capsule( const kf_capsule_t * left, const kf_capsule_t * right );
+kf_bool_t kf_world_overlap_capsule( const kf_aabb_t * boxes, size_t count, const kf_capsule_t * capsule, uint32_t * brush_id );
 
-int kf_raycast_aabb( const kf_ray_t * ray, const kf_aabb_t * box, kf_hit_t * hit );
-int kf_raycast_capsule( const kf_ray_t * ray, const kf_capsule_t * capsule, uint32_t object_id, kf_hit_t * hit );
-int kf_world_raycast( const kf_aabb_t * boxes, size_t count, const kf_ray_t * ray, kf_hit_t * hit );
-int kf_sweep_sphere_aabb_hit( const kf_sphere_t * sphere, kf_vec3_t displacement, const kf_aabb_t * box, kf_hit_t * hit );
-int kf_world_sweep_sphere_hit( const kf_aabb_t * boxes, size_t count, const kf_sphere_t * sphere,
-    kf_vec3_t displacement, kf_hit_t * hit );
-int kf_sweep_sphere_capsule( const kf_sphere_t * sphere, kf_vec3_t displacement,
-    const kf_capsule_t * capsule, uint32_t object_id, kf_hit_t * hit );
-int kf_sweep_capsule_aabb( const kf_capsule_t * capsule, kf_vec3_t displacement, const kf_aabb_t * box, kf_hit_t * hit );
-int kf_world_sweep_capsule( const kf_aabb_t * boxes, size_t count, const kf_capsule_t * capsule,
-    kf_vec3_t displacement, kf_hit_t * hit );
+kf_bool_t kf_raycast_aabb( const kf_ray_t * ray, const kf_aabb_t * box, kf_hit_t * hit );
+kf_bool_t kf_raycast_capsule( const kf_ray_t * ray, const kf_capsule_t * capsule, uint32_t object_id, kf_hit_t * hit );
+kf_bool_t kf_world_raycast( const kf_aabb_t * boxes, size_t count, const kf_ray_t * ray, kf_hit_t * hit );
+kf_bool_t kf_sweep_sphere_aabb_hit( const kf_sphere_t * sphere, kf_vec3_t displacement, const kf_aabb_t * box, kf_hit_t * hit );
+kf_bool_t kf_world_sweep_sphere_hit( const kf_aabb_t * boxes, size_t count, const kf_sphere_t * sphere, kf_vec3_t displacement, kf_hit_t * hit );
+kf_bool_t kf_sweep_sphere_capsule( const kf_sphere_t * sphere, kf_vec3_t displacement, const kf_capsule_t * capsule, uint32_t object_id, kf_hit_t * hit );
+kf_bool_t kf_sweep_capsule_aabb( const kf_capsule_t * capsule, kf_vec3_t displacement, const kf_aabb_t * box, kf_hit_t * hit );
+kf_bool_t kf_world_sweep_capsule( const kf_aabb_t * boxes, size_t count, const kf_capsule_t * capsule, kf_vec3_t displacement, kf_hit_t * hit );
 
-int kf_sweep_sphere_aabb( kf_vec3_t start, kf_vec3_t end, kf_fixed_t radius, const kf_aabb_t * box, kf_fixed_t * hit_time );
-int kf_world_sweep_sphere( const kf_aabb_t * boxes, size_t count, kf_vec3_t start, kf_vec3_t end,
-    kf_fixed_t radius, kf_fixed_t * hit_time, uint32_t * brush_id );
-int kf_world_line_blocked( const kf_aabb_t * boxes, size_t count, kf_vec3_t start, kf_vec3_t end,
-    kf_fixed_t minimum_time, kf_fixed_t maximum_time );
-void kf_character_step( kf_character_body_t * body, const kf_character_config_t * config,
-    const kf_aabb_t * boxes, size_t count, kf_character_result_t * result );
-
-#ifdef __cplusplus
-}
-#endif
+kf_bool_t kf_sweep_sphere_aabb( kf_vec3_t start, kf_vec3_t end, kf_fixed_t radius, const kf_aabb_t * box, kf_fixed_t * hit_time );
+kf_bool_t kf_world_sweep_sphere( const kf_aabb_t * boxes, size_t count, kf_vec3_t start, kf_vec3_t end, kf_fixed_t radius, kf_fixed_t * hit_time, uint32_t * brush_id );
+kf_bool_t kf_world_line_blocked( const kf_aabb_t * boxes, size_t count, kf_vec3_t start, kf_vec3_t end, kf_fixed_t minimum_time, kf_fixed_t maximum_time );
+void kf_character_step( kf_character_body_t * body, const kf_character_config_t * config, const kf_aabb_t * boxes, size_t count, kf_character_result_t * result );
 
 #endif
