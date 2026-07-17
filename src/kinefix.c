@@ -273,6 +273,14 @@ KF_FORCE_INLINE kf_fixed_t __kf_fixed_msub( kf_fixed_t base, kf_fixed_t left, kf
     return __kf_narrow_q32( wide );
 }
 
+KF_FORCE_INLINE kf_fixed_t __kf_fixed_madd2( kf_fixed_t base, kf_fixed_t first, kf_fixed_t first_scalar, kf_fixed_t second, kf_fixed_t second_scalar )
+{
+    int64_t wide;
+    if( __kf_wide_add( (int64_t)base * (int64_t)KF_FIXED_SCALE, (int64_t)first * (int64_t)first_scalar, &wide ) == KF_FALSE ) return 0;
+    if( __kf_wide_add( wide, (int64_t)second * (int64_t)second_scalar, &wide ) == KF_FALSE ) return 0;
+    return __kf_narrow_q32( wide );
+}
+
 KF_FORCE_INLINE kf_bool_t __kf_fixed_madd_q32_wide( kf_fixed_t base, kf_fixed_t value, __kf_q32_t scalar, int64_t * result_q48 )
 {
     uint64_t magnitude;
@@ -325,6 +333,21 @@ KF_FORCE_INLINE kf_vec3_t __kf_vec3_madd( kf_vec3_t base, kf_vec3_t value, kf_fi
     return result;
 }
 
+KF_FORCE_INLINE kf_vec3_t __kf_vec3_msub( kf_vec3_t base, kf_vec3_t value, kf_fixed_t scalar )
+{
+    const kf_vec3_t result = {__kf_fixed_msub( base.x, value.x, scalar ), __kf_fixed_msub( base.y, value.y, scalar ), __kf_fixed_msub( base.z, value.z, scalar )};
+    return result;
+}
+
+KF_FORCE_INLINE kf_vec3_t __kf_vec3_madd2( kf_vec3_t base, kf_vec3_t first, kf_fixed_t first_scalar, kf_vec3_t second, kf_fixed_t second_scalar )
+{
+    const kf_vec3_t result = {
+        __kf_fixed_madd2( base.x, first.x, first_scalar, second.x, second_scalar ),
+        __kf_fixed_madd2( base.y, first.y, first_scalar, second.y, second_scalar ),
+        __kf_fixed_madd2( base.z, first.z, first_scalar, second.z, second_scalar )};
+    return result;
+}
+
 KF_FORCE_INLINE kf_vec3_t __kf_vec3_madd_q32( kf_vec3_t base, kf_vec3_t value, __kf_q32_t scalar )
 {
     const kf_vec3_t result = {__kf_fixed_madd_q32( base.x, value.x, scalar ), __kf_fixed_madd_q32( base.y, value.y, scalar ), __kf_fixed_madd_q32( base.z, value.z, scalar )};
@@ -347,6 +370,16 @@ kf_fixed_t kf_fixed_from_int( int64_t value )
     return (kf_fixed_t)(value * KF_FIXED_SCALE);
 }
 
+kf_fixed_t kf_fixed_from_ratio( int64_t numerator, int64_t denominator )
+{
+    kf_fixed_t result;
+    KF_DEBUG_REQUIRE( denominator != 0, "kinefix ratio conversion division by zero" );
+    if( denominator == 0 ) return 0;
+    if( __kf_ratio_q32_to_fixed( numerator, denominator, &result ) == KF_TRUE ) return result;
+    KF_DEBUG_REQUIRE( 0, "kinefix ratio conversion overflow" );
+    return 0;
+}
+
 kf_fixed_t kf_fixed_from_float( float value )
 {
     const double scaled = (double)value * (double)KF_FIXED_SCALE;
@@ -361,6 +394,11 @@ kf_fixed_t kf_fixed_from_float( float value )
         return 0;
     }
     return (kf_fixed_t)scaled;
+}
+
+int32_t kf_fixed_to_int( kf_fixed_t value )
+{
+    return value / KF_FIXED_SCALE;
 }
 
 double kf_fixed_to_double( kf_fixed_t value )
@@ -421,6 +459,34 @@ kf_fixed_t kf_fixed_div( kf_fixed_t left, kf_fixed_t right )
     if( __kf_fixed_try_div( left, right, &result ) == KF_TRUE ) return result;
     KF_DEBUG_REQUIRE( 0, "kinefix division overflow" );
     return 0;
+}
+
+kf_fixed_t kf_fixed_add_mul( kf_fixed_t base, kf_fixed_t value, kf_fixed_t scalar )
+{
+    return __kf_fixed_madd( base, value, scalar );
+}
+
+kf_fixed_t kf_fixed_sub_mul( kf_fixed_t base, kf_fixed_t value, kf_fixed_t scalar )
+{
+    return __kf_fixed_msub( base, value, scalar );
+}
+
+kf_fixed_t kf_fixed_add_mul2( kf_fixed_t base, kf_fixed_t first, kf_fixed_t first_scalar, kf_fixed_t second, kf_fixed_t second_scalar )
+{
+    return __kf_fixed_madd2( base, first, first_scalar, second, second_scalar );
+}
+
+kf_fixed_t kf_fixed_mul_div( kf_fixed_t value, kf_fixed_t multiplier, kf_fixed_t divisor )
+{
+    return __kf_fixed_mul_div( value, multiplier, divisor );
+}
+
+kf_fixed_t kf_fixed_lerp( kf_fixed_t from, kf_fixed_t to, kf_fixed_t factor )
+{
+    int64_t wide;
+    KF_DEBUG_REQUIRE( factor >= 0 && factor <= KF_FIXED_SCALE, "kinefix lerp factor is outside the unit interval" );
+    if( __kf_wide_add( (int64_t)from * (int64_t)(KF_FIXED_SCALE - factor), (int64_t)to * (int64_t)factor, &wide ) == KF_FALSE ) return 0;
+    return __kf_narrow_q32( wide );
 }
 
 static uint64_t __kf_integer_sqrt_u64( uint64_t value )
@@ -558,6 +624,12 @@ kf_vec3_t kf_vec3_sub( kf_vec3_t left, kf_vec3_t right )
     return result;
 }
 
+kf_vec3_t kf_vec3_neg( kf_vec3_t value )
+{
+    const kf_vec3_t result = {kf_fixed_neg( value.x ), kf_fixed_neg( value.y ), kf_fixed_neg( value.z )};
+    return result;
+}
+
 kf_vec3_t kf_vec3_mul( kf_vec3_t value, kf_fixed_t scalar )
 {
     kf_vec3_t result = {kf_fixed_mul( value.x, scalar ), kf_fixed_mul( value.y, scalar ), kf_fixed_mul( value.z, scalar )};
@@ -568,6 +640,37 @@ kf_vec3_t kf_vec3_div( kf_vec3_t value, kf_fixed_t scalar )
 {
     kf_vec3_t result = {kf_fixed_div( value.x, scalar ), kf_fixed_div( value.y, scalar ), kf_fixed_div( value.z, scalar )};
     return result;
+}
+
+kf_vec3_t kf_vec3_add_mul( kf_vec3_t base, kf_vec3_t value, kf_fixed_t scalar )
+{
+    return __kf_vec3_madd( base, value, scalar );
+}
+
+kf_vec3_t kf_vec3_sub_mul( kf_vec3_t base, kf_vec3_t value, kf_fixed_t scalar )
+{
+    return __kf_vec3_msub( base, value, scalar );
+}
+
+kf_vec3_t kf_vec3_add_mul2( kf_vec3_t base, kf_vec3_t first, kf_fixed_t first_scalar, kf_vec3_t second, kf_fixed_t second_scalar )
+{
+    return __kf_vec3_madd2( base, first, first_scalar, second, second_scalar );
+}
+
+kf_vec3_t kf_vec3_mul_div( kf_vec3_t value, kf_fixed_t multiplier, kf_fixed_t divisor )
+{
+    return __kf_vec3_mul_div( value, multiplier, divisor );
+}
+
+kf_vec3_t kf_vec3_lerp( kf_vec3_t from, kf_vec3_t to, kf_fixed_t factor )
+{
+    const kf_vec3_t result = {kf_fixed_lerp( from.x, to.x, factor ), kf_fixed_lerp( from.y, to.y, factor ), kf_fixed_lerp( from.z, to.z, factor )};
+    return result;
+}
+
+kf_bool_t kf_vec3_equal( kf_vec3_t left, kf_vec3_t right )
+{
+    return (kf_bool_t)(left.x == right.x && left.y == right.y && left.z == right.z);
 }
 
 KF_FORCE_INLINE kf_bool_t __kf_vec3_dot_q32( kf_vec3_t left, kf_vec3_t right, int64_t * result )

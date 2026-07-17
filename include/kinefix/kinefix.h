@@ -117,13 +117,20 @@ typedef struct kf_character_result_t
 } kf_character_result_t;
 
 kf_fixed_t kf_fixed_from_int( int64_t value );
+kf_fixed_t kf_fixed_from_ratio( int64_t numerator, int64_t denominator );
 kf_fixed_t kf_fixed_from_float( float value );
+int32_t kf_fixed_to_int( kf_fixed_t value );
 double kf_fixed_to_double( kf_fixed_t value );
 kf_fixed_t kf_fixed_neg( kf_fixed_t value );
 kf_fixed_t kf_fixed_add( kf_fixed_t left, kf_fixed_t right );
 kf_fixed_t kf_fixed_sub( kf_fixed_t left, kf_fixed_t right );
 kf_fixed_t kf_fixed_mul( kf_fixed_t left, kf_fixed_t right );
 kf_fixed_t kf_fixed_div( kf_fixed_t left, kf_fixed_t right );
+kf_fixed_t kf_fixed_add_mul( kf_fixed_t base, kf_fixed_t value, kf_fixed_t scalar );
+kf_fixed_t kf_fixed_sub_mul( kf_fixed_t base, kf_fixed_t value, kf_fixed_t scalar );
+kf_fixed_t kf_fixed_add_mul2( kf_fixed_t base, kf_fixed_t first, kf_fixed_t first_scalar, kf_fixed_t second, kf_fixed_t second_scalar );
+kf_fixed_t kf_fixed_mul_div( kf_fixed_t value, kf_fixed_t multiplier, kf_fixed_t divisor );
+kf_fixed_t kf_fixed_lerp( kf_fixed_t from, kf_fixed_t to, kf_fixed_t factor );
 
 KF_FORCE_INLINE kf_fixed_t kf_fixed_abs( kf_fixed_t value )
 {
@@ -165,8 +172,15 @@ void kf_sangle16_sin_cos( kf_sangle16_t angle, kf_fixed_t * sine, kf_fixed_t * c
 
 kf_vec3_t kf_vec3_add( kf_vec3_t left, kf_vec3_t right );
 kf_vec3_t kf_vec3_sub( kf_vec3_t left, kf_vec3_t right );
+kf_vec3_t kf_vec3_neg( kf_vec3_t value );
 kf_vec3_t kf_vec3_mul( kf_vec3_t value, kf_fixed_t scalar );
 kf_vec3_t kf_vec3_div( kf_vec3_t value, kf_fixed_t scalar );
+kf_vec3_t kf_vec3_add_mul( kf_vec3_t base, kf_vec3_t value, kf_fixed_t scalar );
+kf_vec3_t kf_vec3_sub_mul( kf_vec3_t base, kf_vec3_t value, kf_fixed_t scalar );
+kf_vec3_t kf_vec3_add_mul2( kf_vec3_t base, kf_vec3_t first, kf_fixed_t first_scalar, kf_vec3_t second, kf_fixed_t second_scalar );
+kf_vec3_t kf_vec3_mul_div( kf_vec3_t value, kf_fixed_t multiplier, kf_fixed_t divisor );
+kf_vec3_t kf_vec3_lerp( kf_vec3_t from, kf_vec3_t to, kf_fixed_t factor );
+kf_bool_t kf_vec3_equal( kf_vec3_t left, kf_vec3_t right );
 kf_fixed_t kf_vec3_dot( kf_vec3_t left, kf_vec3_t right );
 kf_vec3_t kf_vec3_cross( kf_vec3_t left, kf_vec3_t right );
 kf_fixed_t kf_vec3_length_squared( kf_vec3_t value );
