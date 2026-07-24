@@ -50,8 +50,14 @@ KF_FORCE_INLINE __kf_uint128_t __kf_multiply_u64( uint64_t left, uint64_t right 
 
 KF_FORCE_INLINE int32_t __kf_compare_u128( __kf_uint128_t left, __kf_uint128_t right )
 {
-    if( left.high != right.high ) return left.high < right.high ? -1 : 1;
-    if( left.low != right.low ) return left.low < right.low ? -1 : 1;
+    if( left.high != right.high )
+    {
+        return left.high < right.high ? -1 : 1;
+    }
+    if( left.low != right.low )
+    {
+        return left.low < right.low ? -1 : 1;
+    }
     return 0;
 }
 
@@ -99,7 +105,10 @@ static kf_bool_t __kf_divide_u128_u64( __kf_uint128_t numerator, uint64_t diviso
     uint64_t result;
     uint64_t remainder;
     int32_t bit;
-    if( divisor == 0 || quotient == NULL || numerator.high >= divisor ) return KF_FALSE;
+    if( divisor == 0 || quotient == NULL || numerator.high >= divisor )
+    {
+        return KF_FALSE;
+    }
     result = 0;
     remainder = numerator.high;
     for( bit = 63; bit >= 0; --bit )
@@ -127,7 +136,10 @@ static uint64_t __kf_integer_sqrt_u128( __kf_uint128_t value )
     while( bit != 0 )
     {
         const uint64_t candidate = result | bit;
-        if( __kf_compare_u128( __kf_multiply_u64( candidate, candidate ), value ) <= 0 ) result = candidate;
+        if( __kf_compare_u128( __kf_multiply_u64( candidate, candidate ), value ) <= 0 )
+        {
+            result = candidate;
+        }
         bit >>= 1;
     }
     return result;
@@ -138,7 +150,10 @@ KF_FORCE_INLINE kf_bool_t __kf_signed_sum_magnitude( uint64_t left, kf_bool_t le
     if( left_negative == right_negative )
     {
         const uint64_t sum = left + right;
-        if( sum < left ) return KF_FALSE;
+        if( sum < left )
+        {
+            return KF_FALSE;
+        }
         *magnitude = sum;
         *negative = left_negative;
         return KF_TRUE;
@@ -162,16 +177,34 @@ static kf_bool_t __kf_ratio_magnitude_to_fixed( uint64_t numerator, kf_bool_t nu
     uint64_t quotient;
     uint64_t limit;
     kf_bool_t negative;
-    if( denominator == 0 || result == NULL ) return KF_FALSE;
+    if( denominator == 0 || result == NULL )
+    {
+        return KF_FALSE;
+    }
     scaled.high = numerator >> 48;
     scaled.low = numerator << KF_FIXED_FRACTION_BITS;
-    if( __kf_divide_u128_u64( scaled, denominator, &quotient ) == KF_FALSE ) return KF_FALSE;
+    if( __kf_divide_u128_u64( scaled, denominator, &quotient ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     negative = (kf_bool_t)(numerator_negative != denominator_negative && quotient != 0);
     limit = negative == KF_TRUE ? (UINT64_C(1) << 31) : (uint64_t)INT32_MAX;
-    if( quotient > limit ) return KF_FALSE;
-    if( negative == KF_FALSE ) *result = (kf_fixed_t)quotient;
-    else if( quotient == (UINT64_C(1) << 31) ) *result = INT32_MIN;
-    else *result = -(kf_fixed_t)quotient;
+    if( quotient > limit )
+    {
+        return KF_FALSE;
+    }
+    if( negative == KF_FALSE )
+    {
+        *result = (kf_fixed_t)quotient;
+    }
+    else if( quotient == (UINT64_C(1) << 31) )
+    {
+        *result = INT32_MIN;
+    }
+    else
+    {
+        *result = -(kf_fixed_t)quotient;
+    }
     return KF_TRUE;
 }
 
@@ -181,16 +214,34 @@ static kf_bool_t __kf_ratio_magnitude_to_q32( uint64_t numerator, kf_bool_t nume
     uint64_t quotient;
     uint64_t limit;
     kf_bool_t negative;
-    if( denominator == 0 || result == NULL ) return KF_FALSE;
+    if( denominator == 0 || result == NULL )
+    {
+        return KF_FALSE;
+    }
     scaled.high = numerator >> 32;
     scaled.low = numerator << 32;
-    if( __kf_divide_u128_u64( scaled, denominator, &quotient ) == KF_FALSE ) return KF_FALSE;
+    if( __kf_divide_u128_u64( scaled, denominator, &quotient ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     negative = (kf_bool_t)(numerator_negative != denominator_negative && quotient != 0);
     limit = negative == KF_TRUE ? (UINT64_C(1) << 63) : (uint64_t)INT64_MAX;
-    if( quotient > limit ) return KF_FALSE;
-    if( negative == KF_FALSE ) *result = (int64_t)quotient;
-    else if( quotient == (UINT64_C(1) << 63) ) *result = INT64_MIN;
-    else *result = -(int64_t)quotient;
+    if( quotient > limit )
+    {
+        return KF_FALSE;
+    }
+    if( negative == KF_FALSE )
+    {
+        *result = (int64_t)quotient;
+    }
+    else if( quotient == (UINT64_C(1) << 63) )
+    {
+        *result = INT64_MIN;
+    }
+    else
+    {
+        *result = -(int64_t)quotient;
+    }
     return KF_TRUE;
 }
 
@@ -262,22 +313,34 @@ KF_FORCE_INLINE kf_bool_t __kf_wide_sub( int64_t left, int64_t right, int64_t * 
 KF_FORCE_INLINE kf_fixed_t __kf_fixed_madd( kf_fixed_t base, kf_fixed_t left, kf_fixed_t right )
 {
     int64_t wide;
-    if( __kf_wide_add( (int64_t)base * (int64_t)KF_FIXED_SCALE, (int64_t)left * (int64_t)right, &wide ) == KF_FALSE ) return 0;
+    if( __kf_wide_add( (int64_t)base * (int64_t)KF_FIXED_SCALE, (int64_t)left * (int64_t)right, &wide ) == KF_FALSE )
+    {
+        return 0;
+    }
     return __kf_narrow_q32( wide );
 }
 
 KF_FORCE_INLINE kf_fixed_t __kf_fixed_msub( kf_fixed_t base, kf_fixed_t left, kf_fixed_t right )
 {
     int64_t wide;
-    if( __kf_wide_sub( (int64_t)base * (int64_t)KF_FIXED_SCALE, (int64_t)left * (int64_t)right, &wide ) == KF_FALSE ) return 0;
+    if( __kf_wide_sub( (int64_t)base * (int64_t)KF_FIXED_SCALE, (int64_t)left * (int64_t)right, &wide ) == KF_FALSE )
+    {
+        return 0;
+    }
     return __kf_narrow_q32( wide );
 }
 
 KF_FORCE_INLINE kf_fixed_t __kf_fixed_madd2( kf_fixed_t base, kf_fixed_t first, kf_fixed_t first_scalar, kf_fixed_t second, kf_fixed_t second_scalar )
 {
     int64_t wide;
-    if( __kf_wide_add( (int64_t)base * (int64_t)KF_FIXED_SCALE, (int64_t)first * (int64_t)first_scalar, &wide ) == KF_FALSE ) return 0;
-    if( __kf_wide_add( wide, (int64_t)second * (int64_t)second_scalar, &wide ) == KF_FALSE ) return 0;
+    if( __kf_wide_add( (int64_t)base * (int64_t)KF_FIXED_SCALE, (int64_t)first * (int64_t)first_scalar, &wide ) == KF_FALSE )
+    {
+        return 0;
+    }
+    if( __kf_wide_add( wide, (int64_t)second * (int64_t)second_scalar, &wide ) == KF_FALSE )
+    {
+        return 0;
+    }
     return __kf_narrow_q32( wide );
 }
 
@@ -291,9 +354,15 @@ KF_FORCE_INLINE kf_bool_t __kf_fixed_madd_q32_wide( kf_fixed_t base, kf_fixed_t 
     uint64_t product_magnitude;
     uint64_t limit;
     KF_DEBUG_REQUIRE( result_q48 != NULL, "kinefix Q32.32 multiply-add requires an output" );
-    if( result_q48 == NULL ) return KF_FALSE;
+    if( result_q48 == NULL )
+    {
+        return KF_FALSE;
+    }
     KF_DEBUG_REQUIRE( value_magnitude == 0 || scalar_magnitude <= UINT64_MAX / value_magnitude, "kinefix Q32.32 multiply-add product overflow" );
-    if( value_magnitude != 0 && scalar_magnitude > UINT64_MAX / value_magnitude ) return KF_FALSE;
+    if( value_magnitude != 0 && scalar_magnitude > UINT64_MAX / value_magnitude )
+    {
+        return KF_FALSE;
+    }
     product_magnitude = value_magnitude * scalar_magnitude;
     if( __kf_signed_sum_magnitude( base_magnitude, (kf_bool_t)(base < 0), product_magnitude, (kf_bool_t)((value < 0) != (scalar < 0)), &magnitude, &negative ) == KF_FALSE )
     {
@@ -302,17 +371,32 @@ KF_FORCE_INLINE kf_bool_t __kf_fixed_madd_q32_wide( kf_fixed_t base, kf_fixed_t 
     }
     limit = negative == KF_TRUE ? (UINT64_C(1) << 63) : (uint64_t)INT64_MAX;
     KF_DEBUG_REQUIRE( magnitude <= limit, "kinefix Q32.32 multiply-add result overflow" );
-    if( magnitude > limit ) return KF_FALSE;
-    if( negative == KF_FALSE ) *result_q48 = (int64_t)magnitude;
-    else if( magnitude == (UINT64_C(1) << 63) ) *result_q48 = INT64_MIN;
-    else *result_q48 = -(int64_t)magnitude;
+    if( magnitude > limit )
+    {
+        return KF_FALSE;
+    }
+    if( negative == KF_FALSE )
+    {
+        *result_q48 = (int64_t)magnitude;
+    }
+    else if( magnitude == (UINT64_C(1) << 63) )
+    {
+        *result_q48 = INT64_MIN;
+    }
+    else
+    {
+        *result_q48 = -(int64_t)magnitude;
+    }
     return KF_TRUE;
 }
 
 KF_FORCE_INLINE kf_fixed_t __kf_fixed_madd_q32( kf_fixed_t base, kf_fixed_t value, __kf_q32_t scalar )
 {
     int64_t wide_q48;
-    if( __kf_fixed_madd_q32_wide( base, value, scalar, &wide_q48 ) == KF_FALSE ) return 0;
+    if( __kf_fixed_madd_q32_wide( base, value, scalar, &wide_q48 ) == KF_FALSE )
+    {
+        return 0;
+    }
     return __kf_signed_magnitude( __kf_magnitude( wide_q48 ) >> 32, (kf_bool_t)(wide_q48 < 0) );
 }
 
@@ -320,10 +404,16 @@ KF_FORCE_INLINE kf_fixed_t __kf_fixed_mul_div( kf_fixed_t value, kf_fixed_t mult
 {
     int64_t quotient;
     KF_DEBUG_REQUIRE( divisor != 0, "kinefix multiply-divide by zero" );
-    if( divisor == 0 ) return 0;
+    if( divisor == 0 )
+    {
+        return 0;
+    }
     quotient = (int64_t)value * (int64_t)multiplier / (int64_t)divisor;
     KF_DEBUG_REQUIRE( quotient >= INT32_MIN && quotient <= INT32_MAX, "kinefix multiply-divide overflow" );
-    if( quotient < INT32_MIN || quotient > INT32_MAX ) return 0;
+    if( quotient < INT32_MIN || quotient > INT32_MAX )
+    {
+        return 0;
+    }
     return (kf_fixed_t)quotient;
 }
 
@@ -374,8 +464,14 @@ kf_fixed_t kf_fixed_from_ratio( int64_t numerator, int64_t denominator )
 {
     kf_fixed_t result;
     KF_DEBUG_REQUIRE( denominator != 0, "kinefix ratio conversion division by zero" );
-    if( denominator == 0 ) return 0;
-    if( __kf_ratio_q32_to_fixed( numerator, denominator, &result ) == KF_TRUE ) return result;
+    if( denominator == 0 )
+    {
+        return 0;
+    }
+    if( __kf_ratio_q32_to_fixed( numerator, denominator, &result ) == KF_TRUE )
+    {
+        return result;
+    }
     KF_DEBUG_REQUIRE( 0, "kinefix ratio conversion overflow" );
     return 0;
 }
@@ -399,6 +495,11 @@ kf_fixed_t kf_fixed_from_float( float value )
 int32_t kf_fixed_to_int( kf_fixed_t value )
 {
     return value / KF_FIXED_SCALE;
+}
+
+float kf_fixed_to_float( kf_fixed_t value )
+{
+    return (float)value / (float)KF_FIXED_SCALE;
 }
 
 double kf_fixed_to_double( kf_fixed_t value )
@@ -456,7 +557,10 @@ kf_fixed_t kf_fixed_div( kf_fixed_t left, kf_fixed_t right )
     {
         return 0;
     }
-    if( __kf_fixed_try_div( left, right, &result ) == KF_TRUE ) return result;
+    if( __kf_fixed_try_div( left, right, &result ) == KF_TRUE )
+    {
+        return result;
+    }
     KF_DEBUG_REQUIRE( 0, "kinefix division overflow" );
     return 0;
 }
@@ -485,7 +589,10 @@ kf_fixed_t kf_fixed_lerp( kf_fixed_t from, kf_fixed_t to, kf_fixed_t factor )
 {
     int64_t wide;
     KF_DEBUG_REQUIRE( factor >= 0 && factor <= KF_FIXED_SCALE, "kinefix lerp factor is outside the unit interval" );
-    if( __kf_wide_add( (int64_t)from * (int64_t)(KF_FIXED_SCALE - factor), (int64_t)to * (int64_t)factor, &wide ) == KF_FALSE ) return 0;
+    if( __kf_wide_add( (int64_t)from * (int64_t)(KF_FIXED_SCALE - factor), (int64_t)to * (int64_t)factor, &wide ) == KF_FALSE )
+    {
+        return 0;
+    }
     return __kf_narrow_q32( wide );
 }
 
@@ -493,7 +600,10 @@ static uint64_t __kf_integer_sqrt_u64( uint64_t value )
 {
     uint64_t result = 0;
     uint64_t bit = UINT64_C(1) << 62;
-    while( bit > value ) bit >>= 2;
+    while( bit > value )
+    {
+        bit >>= 2;
+    }
     while( bit != 0 )
     {
         if( value >= result + bit )
@@ -520,8 +630,14 @@ kf_fixed_t kf_fixed_sqrt( kf_fixed_t value )
 kf_fixed_t kf_fixed_wrap_angle( kf_fixed_t angle )
 {
     angle %= KF_FIXED_TWO_PI;
-    if( angle > KF_FIXED_PI ) angle = kf_fixed_sub( angle, KF_FIXED_TWO_PI );
-    if( angle < -KF_FIXED_PI ) angle = kf_fixed_add( angle, KF_FIXED_TWO_PI );
+    if( angle > KF_FIXED_PI )
+    {
+        angle = kf_fixed_sub( angle, KF_FIXED_TWO_PI );
+    }
+    if( angle < -KF_FIXED_PI )
+    {
+        angle = kf_fixed_add( angle, KF_FIXED_TWO_PI );
+    }
     return angle;
 }
 
@@ -544,7 +660,10 @@ kf_angle16_t kf_angle16_from_fixed_radians( kf_fixed_t radians )
 kf_sangle16_t kf_sangle16_from_fixed_radians( kf_fixed_t radians )
 {
     const kf_angle16_t wrapped = kf_angle16_from_fixed_radians( radians );
-    if( wrapped <= (kf_angle16_t)INT16_MAX ) return (kf_sangle16_t)wrapped;
+    if( wrapped <= (kf_angle16_t)INT16_MAX )
+    {
+        return (kf_sangle16_t)wrapped;
+    }
     return (kf_sangle16_t)((int32_t)wrapped - (int32_t)KF_ANGLE16_TURN);
 }
 
@@ -572,8 +691,14 @@ kf_sangle16_t kf_sangle16_add_clamped( kf_sangle16_t angle, kf_sangle16_t delta,
         return angle;
     }
     result = (int32_t)angle + (int32_t)delta;
-    if( result < (int32_t)minimum ) result = minimum;
-    if( result > (int32_t)maximum ) result = maximum;
+    if( result < (int32_t)minimum )
+    {
+        result = minimum;
+    }
+    if( result > (int32_t)maximum )
+    {
+        result = maximum;
+    }
     return (kf_sangle16_t)result;
 }
 
@@ -598,8 +723,14 @@ static kf_fixed_t __kf_angle16_sine( kf_angle16_t angle )
 
 void kf_angle16_sin_cos( kf_angle16_t angle, kf_fixed_t * sine, kf_fixed_t * cosine )
 {
-    if( sine != NULL ) *sine = __kf_angle16_sine( angle );
-    if( cosine != NULL ) *cosine = __kf_angle16_sine( (kf_angle16_t)(angle + KF_ANGLE16_QUARTER) );
+    if( sine != NULL )
+    {
+        *sine = __kf_angle16_sine( angle );
+    }
+    if( cosine != NULL )
+    {
+        *cosine = __kf_angle16_sine( (kf_angle16_t)(angle + KF_ANGLE16_QUARTER) );
+    }
 }
 
 void kf_sangle16_sin_cos( kf_sangle16_t angle, kf_fixed_t * sine, kf_fixed_t * cosine )
@@ -689,7 +820,10 @@ static kf_fixed_t __kf_vec3_length_scaled_q32( kf_vec3_t value, __kf_q32_t scala
     uint64_t root;
     uint64_t result;
     KF_DEBUG_REQUIRE( scalar_magnitude <= (UINT64_C(1) << 32), "kinefix Q32.32 length scale is outside the unit interval" );
-    if( scalar_magnitude > (UINT64_C(1) << 32) || __kf_vec3_dot_q32( value, value, &square_q32 ) == KF_FALSE || square_q32 < 0 ) return 0;
+    if( scalar_magnitude > (UINT64_C(1) << 32) || __kf_vec3_dot_q32( value, value, &square_q32 ) == KF_FALSE || square_q32 < 0 )
+    {
+        return 0;
+    }
     if( scalar_magnitude == (UINT64_C(1) << 32) )
     {
         root = __kf_integer_sqrt_u64( (uint64_t)square_q32 );
@@ -704,7 +838,10 @@ static kf_fixed_t __kf_vec3_length_scaled_q32( kf_vec3_t value, __kf_q32_t scala
 kf_fixed_t kf_vec3_dot( kf_vec3_t left, kf_vec3_t right )
 {
     int64_t wide;
-    if( __kf_vec3_dot_q32( left, right, &wide ) == KF_FALSE ) return 0;
+    if( __kf_vec3_dot_q32( left, right, &wide ) == KF_FALSE )
+    {
+        return 0;
+    }
     return __kf_narrow_q32( wide );
 }
 
@@ -726,12 +863,18 @@ kf_vec3_t kf_vec3_cross( kf_vec3_t left, kf_vec3_t right )
     return result;
 }
 
-kf_fixed_t kf_vec3_length_squared( kf_vec3_t value ) { return kf_vec3_dot( value, value ); }
+kf_fixed_t kf_vec3_length_squared( kf_vec3_t value )
+{
+    return kf_vec3_dot( value, value );
+}
 kf_fixed_t kf_vec3_length( kf_vec3_t value )
 {
     int64_t square_q32;
     uint64_t root;
-    if( __kf_vec3_dot_q32( value, value, &square_q32 ) == KF_FALSE || square_q32 < 0 ) return 0;
+    if( __kf_vec3_dot_q32( value, value, &square_q32 ) == KF_FALSE || square_q32 < 0 )
+    {
+        return 0;
+    }
     root = __kf_integer_sqrt_u64( (uint64_t)square_q32 );
     return __kf_signed_magnitude( root, KF_FALSE );
 }
@@ -756,18 +899,30 @@ kf_fixed_t kf_segment_point_distance_squared( kf_vec3_t start, kf_vec3_t end, kf
     if( __kf_vec3_dot_q32( segment, segment, &length_squared_q32 ) == KF_FALSE ||
         __kf_vec3_dot_q32( relative, segment, &projection_q32 ) == KF_FALSE ||
         __kf_vec3_dot_q32( relative, relative, &point_distance_q32 ) == KF_FALSE ) return 0;
-    if( length_squared_q32 == 0 || projection_q32 <= 0 ) return __kf_narrow_q32( point_distance_q32 );
+    if( length_squared_q32 == 0 || projection_q32 <= 0 )
+    {
+        return __kf_narrow_q32( point_distance_q32 );
+    }
     if( projection_q32 >= length_squared_q32 )
     {
         int64_t end_distance_q32;
         const kf_vec3_t end_relative = kf_vec3_sub( point, end );
-        if( __kf_vec3_dot_q32( end_relative, end_relative, &end_distance_q32 ) == KF_FALSE ) return 0;
+        if( __kf_vec3_dot_q32( end_relative, end_relative, &end_distance_q32 ) == KF_FALSE )
+        {
+            return 0;
+        }
         return __kf_narrow_q32( end_distance_q32 );
     }
     projection_squared = __kf_multiply_u64( (uint64_t)projection_q32, (uint64_t)projection_q32 );
-    if( __kf_divide_u128_u64( projection_squared, (uint64_t)length_squared_q32, &correction_q32 ) == KF_FALSE ) return 0;
+    if( __kf_divide_u128_u64( projection_squared, (uint64_t)length_squared_q32, &correction_q32 ) == KF_FALSE )
+    {
+        return 0;
+    }
     KF_DEBUG_REQUIRE( correction_q32 <= (uint64_t)INT64_MAX, "kinefix segment projection overflow" );
-    if( correction_q32 > (uint64_t)INT64_MAX || __kf_wide_sub( point_distance_q32, (int64_t)correction_q32, &result_q32 ) == KF_FALSE ) return 0;
+    if( correction_q32 > (uint64_t)INT64_MAX || __kf_wide_sub( point_distance_q32, (int64_t)correction_q32, &result_q32 ) == KF_FALSE )
+    {
+        return 0;
+    }
     return __kf_narrow_q32( result_q32 );
 }
 
@@ -781,7 +936,10 @@ uint64_t kf_splitmix64( uint64_t value )
 
 void kf_pcg32_seed( kf_pcg32_t * random, uint64_t seed, uint64_t stream )
 {
-    if( random == NULL ) return;
+    if( random == NULL )
+    {
+        return;
+    }
     random->state = 0;
     random->increment = (stream << 1u) | UINT64_C(1);
     (void)kf_pcg32_next( random );
@@ -801,18 +959,27 @@ uint32_t kf_pcg32_next( kf_pcg32_t * random )
 uint32_t kf_pcg32_bounded( kf_pcg32_t * random, uint32_t bound )
 {
     uint32_t threshold;
-    if( bound == 0 ) return 0;
+    if( bound == 0 )
+    {
+        return 0;
+    }
     threshold = (0u - bound) % bound;
     for( ;; )
     {
         const uint32_t value = kf_pcg32_next( random );
-        if( value >= threshold ) return value % bound;
+        if( value >= threshold )
+        {
+            return value % bound;
+        }
     }
 }
 
 void kf_pcg32_restore( kf_pcg32_t * random, uint64_t state, uint64_t stream )
 {
-    if( random == NULL ) return;
+    if( random == NULL )
+    {
+        return;
+    }
     random->state = state;
     random->increment = stream | UINT64_C(1);
 }
@@ -821,9 +988,18 @@ KF_FORCE_INLINE kf_vec3_t __kf_normal_axis( size_t axis, int32_t sign )
 {
     kf_vec3_t normal = {0, 0, 0};
     const kf_fixed_t value = sign < 0 ? -KF_FIXED_SCALE : KF_FIXED_SCALE;
-    if( axis == 0 ) normal.x = value;
-    else if( axis == 1 ) normal.y = value;
-    else normal.z = value;
+    if( axis == 0 )
+    {
+        normal.x = value;
+    }
+    else if( axis == 1 )
+    {
+        normal.y = value;
+    }
+    else
+    {
+        normal.z = value;
+    }
     return normal;
 }
 
@@ -846,35 +1022,56 @@ static kf_bool_t __kf_sweep_point_bounds( kf_vec3_t origin, kf_vec3_t displaceme
         __kf_q32_t axis_exit_q32 = unit_q32;
         int32_t axis_sign = 0;
 
-        if( origins[axis] <= minimum[axis] || origins[axis] >= maximum[axis] ) started_inside = KF_FALSE;
+        if( origins[axis] <= minimum[axis] || origins[axis] >= maximum[axis] )
+        {
+            started_inside = KF_FALSE;
+        }
 
         if( deltas[axis] > 0 )
         {
-            if( origins[axis] > maximum[axis] || end < minimum[axis] ) return KF_FALSE;
+            if( origins[axis] > maximum[axis] || end < minimum[axis] )
+            {
+                return KF_FALSE;
+            }
             if( origins[axis] < minimum[axis] )
             {
-                if( __kf_ratio_fixed_to_q32( kf_fixed_sub( minimum[axis], origins[axis] ), deltas[axis], &axis_entry_q32 ) == KF_FALSE ) return KF_FALSE;
+                if( __kf_ratio_fixed_to_q32( kf_fixed_sub( minimum[axis], origins[axis] ), deltas[axis], &axis_entry_q32 ) == KF_FALSE )
+                {
+                    return KF_FALSE;
+                }
                 axis_sign = -1;
             }
             else if( origins[axis] == minimum[axis] )
             {
                 axis_sign = -1;
             }
-            if( end > maximum[axis] && __kf_ratio_fixed_to_q32( kf_fixed_sub( maximum[axis], origins[axis] ), deltas[axis], &axis_exit_q32 ) == KF_FALSE ) return KF_FALSE;
+            if( end > maximum[axis] && __kf_ratio_fixed_to_q32( kf_fixed_sub( maximum[axis], origins[axis] ), deltas[axis], &axis_exit_q32 ) == KF_FALSE )
+            {
+                return KF_FALSE;
+            }
         }
         else if( deltas[axis] < 0 )
         {
-            if( origins[axis] < minimum[axis] || end > maximum[axis] ) return KF_FALSE;
+            if( origins[axis] < minimum[axis] || end > maximum[axis] )
+            {
+                return KF_FALSE;
+            }
             if( origins[axis] > maximum[axis] )
             {
-                if( __kf_ratio_fixed_to_q32( kf_fixed_sub( maximum[axis], origins[axis] ), deltas[axis], &axis_entry_q32 ) == KF_FALSE ) return KF_FALSE;
+                if( __kf_ratio_fixed_to_q32( kf_fixed_sub( maximum[axis], origins[axis] ), deltas[axis], &axis_entry_q32 ) == KF_FALSE )
+                {
+                    return KF_FALSE;
+                }
                 axis_sign = 1;
             }
             else if( origins[axis] == maximum[axis] )
             {
                 axis_sign = 1;
             }
-            if( end < minimum[axis] && __kf_ratio_fixed_to_q32( kf_fixed_sub( minimum[axis], origins[axis] ), deltas[axis], &axis_exit_q32 ) == KF_FALSE ) return KF_FALSE;
+            if( end < minimum[axis] && __kf_ratio_fixed_to_q32( kf_fixed_sub( minimum[axis], origins[axis] ), deltas[axis], &axis_exit_q32 ) == KF_FALSE )
+            {
+                return KF_FALSE;
+            }
         }
         else if( origins[axis] <= minimum[axis] || origins[axis] >= maximum[axis] )
         {
@@ -887,11 +1084,20 @@ static kf_bool_t __kf_sweep_point_bounds( kf_vec3_t origin, kf_vec3_t displaceme
             entry_axis = axis;
             entry_sign = axis_sign;
         }
-        if( axis_exit_q32 < exit_q32 ) exit_q32 = axis_exit_q32;
-        if( entry_q32 > exit_q32 ) return KF_FALSE;
+        if( axis_exit_q32 < exit_q32 )
+        {
+            exit_q32 = axis_exit_q32;
+        }
+        if( entry_q32 > exit_q32 )
+        {
+            return KF_FALSE;
+        }
     }
 
-    if( exit_q32 <= 0 || entry_q32 > unit_q32 ) return KF_FALSE;
+    if( exit_q32 <= 0 || entry_q32 > unit_q32 )
+    {
+        return KF_FALSE;
+    }
     if( hit != NULL )
     {
         *hit = (kf_hit_t){0};
@@ -920,7 +1126,10 @@ KF_FORCE_INLINE kf_bool_t __kf_capsule_valid( const kf_capsule_t * capsule )
 
 kf_bool_t kf_overlap_aabb_aabb( const kf_aabb_t * left, const kf_aabb_t * right )
 {
-    if( left == NULL || right == NULL ) return KF_FALSE;
+    if( left == NULL || right == NULL )
+    {
+        return KF_FALSE;
+    }
     return (kf_bool_t)(left->maximum[0] > right->minimum[0] && left->minimum[0] < right->maximum[0] &&
         left->maximum[1] > right->minimum[1] && left->minimum[1] < right->maximum[1] &&
         left->maximum[2] > right->minimum[2] && left->minimum[2] < right->maximum[2]);
@@ -932,14 +1141,20 @@ kf_bool_t kf_overlap_sphere_aabb( const kf_sphere_t * sphere, const kf_aabb_t * 
     kf_fixed_t dy;
     kf_fixed_t dz;
     int64_t distance_squared;
-    if( sphere == NULL || box == NULL || sphere->radius < 0 ) return KF_FALSE;
+    if( sphere == NULL || box == NULL || sphere->radius < 0 )
+    {
+        return KF_FALSE;
+    }
     dx = sphere->position.x < box->minimum[0] ? kf_fixed_sub( box->minimum[0], sphere->position.x ) :
         (sphere->position.x > box->maximum[0] ? kf_fixed_sub( sphere->position.x, box->maximum[0] ) : 0);
     dy = sphere->position.y < box->minimum[1] ? kf_fixed_sub( box->minimum[1], sphere->position.y ) :
         (sphere->position.y > box->maximum[1] ? kf_fixed_sub( sphere->position.y, box->maximum[1] ) : 0);
     dz = sphere->position.z < box->minimum[2] ? kf_fixed_sub( box->minimum[2], sphere->position.z ) :
         (sphere->position.z > box->maximum[2] ? kf_fixed_sub( sphere->position.z, box->maximum[2] ) : 0);
-    if( __kf_vec3_dot_q32( (kf_vec3_t){dx, dy, dz}, (kf_vec3_t){dx, dy, dz}, &distance_squared ) == KF_FALSE ) return KF_FALSE;
+    if( __kf_vec3_dot_q32( (kf_vec3_t){dx, dy, dz}, (kf_vec3_t){dx, dy, dz}, &distance_squared ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     return (kf_bool_t)(distance_squared < (int64_t)sphere->radius * (int64_t)sphere->radius);
 }
 
@@ -951,7 +1166,10 @@ kf_bool_t kf_overlap_capsule_aabb( const kf_capsule_t * capsule, const kf_aabb_t
     kf_fixed_t dy;
     kf_fixed_t dz;
     int64_t distance_squared;
-    if( box == NULL || __kf_capsule_valid( capsule ) == KF_FALSE ) return KF_FALSE;
+    if( box == NULL || __kf_capsule_valid( capsule ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     segment_minimum_y = kf_fixed_add( capsule->position.y, capsule->radius );
     segment_maximum_y = kf_fixed_sub( kf_fixed_add( capsule->position.y, capsule->height ), capsule->radius );
     dx = capsule->position.x < box->minimum[0] ? kf_fixed_sub( box->minimum[0], capsule->position.x ) :
@@ -960,7 +1178,10 @@ kf_bool_t kf_overlap_capsule_aabb( const kf_capsule_t * capsule, const kf_aabb_t
         (segment_minimum_y > box->maximum[1] ? kf_fixed_sub( segment_minimum_y, box->maximum[1] ) : 0);
     dz = capsule->position.z < box->minimum[2] ? kf_fixed_sub( box->minimum[2], capsule->position.z ) :
         (capsule->position.z > box->maximum[2] ? kf_fixed_sub( capsule->position.z, box->maximum[2] ) : 0);
-    if( __kf_vec3_dot_q32( (kf_vec3_t){dx, dy, dz}, (kf_vec3_t){dx, dy, dz}, &distance_squared ) == KF_FALSE ) return KF_FALSE;
+    if( __kf_vec3_dot_q32( (kf_vec3_t){dx, dy, dz}, (kf_vec3_t){dx, dy, dz}, &distance_squared ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     return (kf_bool_t)(distance_squared < (int64_t)capsule->radius * (int64_t)capsule->radius);
 }
 
@@ -973,14 +1194,20 @@ kf_bool_t kf_overlap_sphere_capsule( const kf_sphere_t * sphere, const kf_capsul
     kf_vec3_t closest;
     kf_vec3_t relative;
     int64_t distance_squared;
-    if( sphere == NULL || sphere->radius < 0 || __kf_capsule_valid( capsule ) == KF_FALSE ) return KF_FALSE;
+    if( sphere == NULL || sphere->radius < 0 || __kf_capsule_valid( capsule ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     segment_minimum_y = kf_fixed_add( capsule->position.y, capsule->radius );
     segment_maximum_y = kf_fixed_sub( kf_fixed_add( capsule->position.y, capsule->height ), capsule->radius );
     closest_y = kf_fixed_clamp( sphere->position.y, segment_minimum_y, segment_maximum_y );
     closest = (kf_vec3_t){capsule->position.x, closest_y, capsule->position.z};
     combined_radius = kf_fixed_add( sphere->radius, capsule->radius );
     relative = kf_vec3_sub( sphere->position, closest );
-    if( __kf_vec3_dot_q32( relative, relative, &distance_squared ) == KF_FALSE ) return KF_FALSE;
+    if( __kf_vec3_dot_q32( relative, relative, &distance_squared ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     return (kf_bool_t)(distance_squared < (int64_t)combined_radius * (int64_t)combined_radius);
 }
 
@@ -994,7 +1221,10 @@ kf_bool_t kf_overlap_capsule_capsule( const kf_capsule_t * left, const kf_capsul
     kf_fixed_t combined_radius;
     kf_vec3_t relative;
     int64_t distance_squared;
-    if( __kf_capsule_valid( left ) == KF_FALSE || __kf_capsule_valid( right ) == KF_FALSE ) return KF_FALSE;
+    if( __kf_capsule_valid( left ) == KF_FALSE || __kf_capsule_valid( right ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     left_minimum_y = kf_fixed_add( left->position.y, left->radius );
     left_maximum_y = kf_fixed_sub( kf_fixed_add( left->position.y, left->height ), left->radius );
     right_minimum_y = kf_fixed_add( right->position.y, right->radius );
@@ -1003,7 +1233,10 @@ kf_bool_t kf_overlap_capsule_capsule( const kf_capsule_t * left, const kf_capsul
         (right_maximum_y < left_minimum_y ? kf_fixed_sub( left_minimum_y, right_maximum_y ) : 0);
     combined_radius = kf_fixed_add( left->radius, right->radius );
     relative = (kf_vec3_t){kf_fixed_sub( left->position.x, right->position.x ), dy, kf_fixed_sub( left->position.z, right->position.z )};
-    if( __kf_vec3_dot_q32( relative, relative, &distance_squared ) == KF_FALSE ) return KF_FALSE;
+    if( __kf_vec3_dot_q32( relative, relative, &distance_squared ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     return (kf_bool_t)(distance_squared < (int64_t)combined_radius * (int64_t)combined_radius);
 }
 
@@ -1014,14 +1247,20 @@ kf_bool_t kf_world_overlap_capsule( const kf_aabb_t * boxes, size_t count, const
     uint32_t selected_id = UINT32_MAX;
     for( index = 0; index != count; ++index )
     {
-        if( kf_overlap_capsule_aabb( capsule, boxes + index ) == KF_FALSE ) continue;
+        if( kf_overlap_capsule_aabb( capsule, boxes + index ) == KF_FALSE )
+        {
+            continue;
+        }
         if( found == KF_FALSE || boxes[index].id < selected_id )
         {
             found = KF_TRUE;
             selected_id = boxes[index].id;
         }
     }
-    if( found == KF_TRUE && brush_id != NULL ) *brush_id = selected_id;
+    if( found == KF_TRUE && brush_id != NULL )
+    {
+        *brush_id = selected_id;
+    }
     return found;
 }
 
@@ -1030,9 +1269,15 @@ kf_bool_t kf_raycast_aabb( const kf_ray_t * ray, const kf_aabb_t * box, kf_hit_t
     kf_fixed_t direction_length;
     kf_vec3_t displacement;
     kf_bool_t result;
-    if( ray == NULL || box == NULL || ray->maximum_distance <= 0 ) return KF_FALSE;
+    if( ray == NULL || box == NULL || ray->maximum_distance <= 0 )
+    {
+        return KF_FALSE;
+    }
     direction_length = kf_vec3_length( ray->direction );
-    if( direction_length == 0 ) return KF_FALSE;
+    if( direction_length == 0 )
+    {
+        return KF_FALSE;
+    }
     displacement = __kf_vec3_mul_div( ray->direction, ray->maximum_distance, direction_length );
     result = __kf_sweep_point_bounds( ray->origin, displacement, box->minimum, box->maximum, box->id, hit );
     return result;
@@ -1046,14 +1291,20 @@ kf_bool_t kf_world_raycast( const kf_aabb_t * boxes, size_t count, const kf_ray_
     for( index = 0; index != count; ++index )
     {
         kf_hit_t candidate;
-        if( kf_raycast_aabb( ray, boxes + index, &candidate ) == KF_FALSE ) continue;
+        if( kf_raycast_aabb( ray, boxes + index, &candidate ) == KF_FALSE )
+        {
+            continue;
+        }
         if( __kf_hit_precedes( &candidate, &selected, found ) == KF_TRUE )
         {
             selected = candidate;
             found = KF_TRUE;
         }
     }
-    if( found == KF_TRUE && hit != NULL ) *hit = selected;
+    if( found == KF_TRUE && hit != NULL )
+    {
+        *hit = selected;
+    }
     return found;
 }
 
@@ -1062,7 +1313,10 @@ kf_bool_t kf_sweep_sphere_aabb_hit( const kf_sphere_t * sphere, kf_vec3_t displa
     kf_fixed_t minimum[3];
     kf_fixed_t maximum[3];
     kf_bool_t result;
-    if( sphere == NULL || box == NULL || sphere->radius < 0 ) return KF_FALSE;
+    if( sphere == NULL || box == NULL || sphere->radius < 0 )
+    {
+        return KF_FALSE;
+    }
     minimum[0] = kf_fixed_sub( box->minimum[0], sphere->radius );
     minimum[1] = kf_fixed_sub( box->minimum[1], sphere->radius );
     minimum[2] = kf_fixed_sub( box->minimum[2], sphere->radius );
@@ -1081,14 +1335,20 @@ kf_bool_t kf_world_sweep_sphere_hit( const kf_aabb_t * boxes, size_t count, cons
     for( index = 0; index != count; ++index )
     {
         kf_hit_t candidate;
-        if( kf_sweep_sphere_aabb_hit( sphere, displacement, boxes + index, &candidate ) == KF_FALSE ) continue;
+        if( kf_sweep_sphere_aabb_hit( sphere, displacement, boxes + index, &candidate ) == KF_FALSE )
+        {
+            continue;
+        }
         if( __kf_hit_precedes( &candidate, &selected, found ) == KF_TRUE )
         {
             selected = candidate;
             found = KF_TRUE;
         }
     }
-    if( found == KF_TRUE && hit != NULL ) *hit = selected;
+    if( found == KF_TRUE && hit != NULL )
+    {
+        *hit = selected;
+    }
     return found;
 }
 
@@ -1096,8 +1356,14 @@ static kf_bool_t __kf_append_quadratic_root( uint64_t left, kf_bool_t left_negat
 {
     uint64_t numerator;
     kf_bool_t numerator_negative;
-    if( __kf_signed_sum_magnitude( left, left_negative, right, right_negative, &numerator, &numerator_negative ) == KF_FALSE ) return KF_FALSE;
-    if( __kf_ratio_magnitude_to_q32( numerator, numerator_negative, denominator, denominator_negative, roots + *count ) == KF_FALSE ) return KF_FALSE;
+    if( __kf_signed_sum_magnitude( left, left_negative, right, right_negative, &numerator, &numerator_negative ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
+    if( __kf_ratio_magnitude_to_q32( numerator, numerator_negative, denominator, denominator_negative, roots + *count ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     ++*count;
     return KF_TRUE;
 }
@@ -1117,24 +1383,42 @@ static size_t __kf_quadratic_roots_q32( __kf_q32_t a, __kf_q32_t b, __kf_q32_t c
     size_t count = 0;
     if( a == 0 )
     {
-        if( b == 0 ) return 0;
-        if( __kf_ratio_magnitude_to_q32( c_magnitude, (kf_bool_t)(c_negative == KF_FALSE && c != 0), b_magnitude, b_negative, roots ) == KF_FALSE ) return 0;
+        if( b == 0 )
+        {
+            return 0;
+        }
+        if( __kf_ratio_magnitude_to_q32( c_magnitude, (kf_bool_t)(c_negative == KF_FALSE && c != 0), b_magnitude, b_negative, roots ) == KF_FALSE )
+        {
+            return 0;
+        }
         return 1;
     }
     discriminant = __kf_multiply_u64( b_magnitude, b_magnitude );
-    if( __kf_shift_left_two_u128( __kf_multiply_u64( a_magnitude, c_magnitude ), &four_ac ) == KF_FALSE ) return 0;
+    if( __kf_shift_left_two_u128( __kf_multiply_u64( a_magnitude, c_magnitude ), &four_ac ) == KF_FALSE )
+    {
+        return 0;
+    }
     if( a_negative != c_negative )
     {
-        if( __kf_add_u128( discriminant, four_ac, &discriminant ) == KF_FALSE ) return 0;
+        if( __kf_add_u128( discriminant, four_ac, &discriminant ) == KF_FALSE )
+        {
+            return 0;
+        }
     }
     else
     {
-        if( __kf_compare_u128( discriminant, four_ac ) < 0 ) return 0;
+        if( __kf_compare_u128( discriminant, four_ac ) < 0 )
+        {
+            return 0;
+        }
         discriminant = __kf_sub_u128( discriminant, four_ac );
     }
     square_root = __kf_integer_sqrt_u128( discriminant );
     KF_DEBUG_REQUIRE( a_magnitude <= UINT64_MAX / UINT64_C(2), "kinefix quadratic denominator overflow" );
-    if( a_magnitude > UINT64_MAX / UINT64_C(2) ) return 0;
+    if( a_magnitude > UINT64_MAX / UINT64_C(2) )
+    {
+        return 0;
+    }
     denominator = a_magnitude * UINT64_C(2);
     (void)__kf_append_quadratic_root( b_magnitude, (kf_bool_t)(b_negative == KF_FALSE && b != 0), square_root, KF_TRUE, denominator, a_negative, roots, &count );
     (void)__kf_append_quadratic_root( b_magnitude, (kf_bool_t)(b_negative == KF_FALSE && b != 0), square_root, KF_FALSE, denominator, a_negative, roots, &count );
@@ -1143,8 +1427,14 @@ static size_t __kf_quadratic_roots_q32( __kf_q32_t a, __kf_q32_t b, __kf_q32_t c
 
 static void __kf_consider_capsule_root( __kf_q32_t root, kf_bool_t restrict_y, int64_t y_q48, kf_fixed_t minimum_y, kf_fixed_t maximum_y, kf_bool_t * found, __kf_q32_t * selected )
 {
-    if( root < 0 || root > (INT64_C(1) << 32) ) return;
-    if( restrict_y == KF_TRUE && (y_q48 < (int64_t)minimum_y * (INT64_C(1) << 32) || y_q48 > (int64_t)maximum_y * (INT64_C(1) << 32)) ) return;
+    if( root < 0 || root > (INT64_C(1) << 32) )
+    {
+        return;
+    }
+    if( restrict_y == KF_TRUE && (y_q48 < (int64_t)minimum_y * (INT64_C(1) << 32) || y_q48 > (int64_t)maximum_y * (INT64_C(1) << 32)) )
+    {
+        return;
+    }
     if( *found == KF_FALSE || root < *selected )
     {
         *found = KF_TRUE;
@@ -1171,11 +1461,20 @@ kf_bool_t kf_sweep_sphere_capsule( const kf_sphere_t * sphere, kf_vec3_t displac
     kf_vec3_t centers[2];
     __kf_q32_t wide;
 
-    if( sphere == NULL || sphere->radius < 0 || __kf_capsule_valid( capsule ) == KF_FALSE ) return KF_FALSE;
-    if( __kf_vec3_dot_q32( displacement, displacement, &displacement_length_squared_q32 ) == KF_FALSE ) return KF_FALSE;
+    if( sphere == NULL || sphere->radius < 0 || __kf_capsule_valid( capsule ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
+    if( __kf_vec3_dot_q32( displacement, displacement, &displacement_length_squared_q32 ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     if( displacement_length_squared_q32 == 0 )
     {
-        if( kf_overlap_sphere_capsule( sphere, capsule ) == KF_FALSE ) return KF_FALSE;
+        if( kf_overlap_sphere_capsule( sphere, capsule ) == KF_FALSE )
+        {
+            return KF_FALSE;
+        }
         if( hit != NULL )
         {
             *hit = (kf_hit_t){0};
@@ -1210,7 +1509,10 @@ kf_bool_t kf_sweep_sphere_capsule( const kf_sphere_t * sphere, kf_vec3_t displac
         if( root_count != 0 && roots[0] >= 0 && roots[0] <= (INT64_C(1) << 32) )
         {
             int64_t y_q48;
-            if( __kf_fixed_madd_q32_wide( sphere->position.y, displacement.y, roots[0], &y_q48 ) == KF_FALSE ) return KF_FALSE;
+            if( __kf_fixed_madd_q32_wide( sphere->position.y, displacement.y, roots[0], &y_q48 ) == KF_FALSE )
+            {
+                return KF_FALSE;
+            }
             __kf_consider_capsule_root( roots[0], KF_TRUE, y_q48, segment_minimum_y, segment_maximum_y, &found, &selected );
         }
 
@@ -1224,11 +1526,17 @@ kf_bool_t kf_sweep_sphere_capsule( const kf_sphere_t * sphere, kf_vec3_t displac
             if( __kf_vec3_dot_q32( relative, relative, &wide ) == KF_FALSE ||
                 __kf_wide_sub( wide, radius_squared_q32, &c_q32 ) == KF_FALSE ) return KF_FALSE;
             root_count = __kf_quadratic_roots_q32( displacement_length_squared_q32, b_q32, c_q32, roots );
-            if( root_count != 0 ) __kf_consider_capsule_root( roots[0], KF_FALSE, 0, 0, 0, &found, &selected );
+            if( root_count != 0 )
+            {
+                __kf_consider_capsule_root( roots[0], KF_FALSE, 0, 0, 0, &found, &selected );
+            }
         }
     }
 
-    if( found == KF_FALSE ) return KF_FALSE;
+    if( found == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     if( hit != NULL )
     {
         kf_fixed_t closest_y;
@@ -1241,7 +1549,10 @@ kf_bool_t kf_sweep_sphere_capsule( const kf_sphere_t * sphere, kf_vec3_t displac
         closest_y = kf_fixed_clamp( hit->position.y, segment_minimum_y, segment_maximum_y );
         closest = (kf_vec3_t){capsule->position.x, closest_y, capsule->position.z};
         hit->normal = kf_vec3_normalize( kf_vec3_sub( hit->position, closest ) );
-        if( hit->normal.x == 0 && hit->normal.y == 0 && hit->normal.z == 0 ) hit->normal = kf_vec3_mul( kf_vec3_normalize( displacement ), -KF_FIXED_SCALE );
+        if( hit->normal.x == 0 && hit->normal.y == 0 && hit->normal.z == 0 )
+        {
+            hit->normal = kf_vec3_mul( kf_vec3_normalize( displacement ), -KF_FIXED_SCALE );
+        }
         hit->started_inside = (kf_bool_t)(selected == 0 && kf_overlap_sphere_capsule( sphere, capsule ) == KF_TRUE);
     }
     return KF_TRUE;
@@ -1252,9 +1563,15 @@ kf_bool_t kf_raycast_capsule( const kf_ray_t * ray, const kf_capsule_t * capsule
     kf_fixed_t direction_length;
     kf_vec3_t displacement;
     kf_sphere_t point;
-    if( ray == NULL || ray->maximum_distance <= 0 || __kf_capsule_valid( capsule ) == KF_FALSE ) return KF_FALSE;
+    if( ray == NULL || ray->maximum_distance <= 0 || __kf_capsule_valid( capsule ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     direction_length = kf_vec3_length( ray->direction );
-    if( direction_length == 0 ) return KF_FALSE;
+    if( direction_length == 0 )
+    {
+        return KF_FALSE;
+    }
     displacement = __kf_vec3_mul_div( ray->direction, ray->maximum_distance, direction_length );
     point.position = ray->origin;
     point.radius = 0;
@@ -1266,7 +1583,10 @@ kf_bool_t kf_sweep_capsule_aabb( const kf_capsule_t * capsule, kf_vec3_t displac
     kf_fixed_t minimum[3];
     kf_fixed_t maximum[3];
     kf_bool_t result;
-    if( box == NULL || __kf_capsule_valid( capsule ) == KF_FALSE ) return KF_FALSE;
+    if( box == NULL || __kf_capsule_valid( capsule ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     minimum[0] = kf_fixed_sub( box->minimum[0], capsule->radius );
     minimum[1] = kf_fixed_sub( box->minimum[1], capsule->height );
     minimum[2] = kf_fixed_sub( box->minimum[2], capsule->radius );
@@ -1285,14 +1605,20 @@ kf_bool_t kf_world_sweep_capsule( const kf_aabb_t * boxes, size_t count, const k
     for( index = 0; index != count; ++index )
     {
         kf_hit_t candidate;
-        if( kf_sweep_capsule_aabb( capsule, displacement, boxes + index, &candidate ) == KF_FALSE ) continue;
+        if( kf_sweep_capsule_aabb( capsule, displacement, boxes + index, &candidate ) == KF_FALSE )
+        {
+            continue;
+        }
         if( __kf_hit_precedes( &candidate, &selected, found ) == KF_TRUE )
         {
             selected = candidate;
             found = KF_TRUE;
         }
     }
-    if( found == KF_TRUE && hit != NULL ) *hit = selected;
+    if( found == KF_TRUE && hit != NULL )
+    {
+        *hit = selected;
+    }
     return found;
 }
 
@@ -1317,12 +1643,21 @@ kf_bool_t kf_world_find_step_top( const kf_aabb_t * boxes, size_t count, kf_vec3
     {
         const kf_aabb_t * box = boxes + index;
         const kf_fixed_t box_top = box->maximum[1];
-        if( kf_aabb_overlaps_character( box, candidate, half_width, height ) == KF_FALSE ) continue;
-        if( box_top <= current_y || kf_fixed_sub( box_top, current_y ) > maximum_step ) continue;
+        if( kf_aabb_overlaps_character( box, candidate, half_width, height ) == KF_FALSE )
+        {
+            continue;
+        }
+        if( box_top <= current_y || kf_fixed_sub( box_top, current_y ) > maximum_step )
+        {
+            continue;
+        }
         selected = kf_fixed_max( selected, box_top );
         found = KF_TRUE;
     }
-    if( top != NULL ) *top = selected;
+    if( top != NULL )
+    {
+        *top = selected;
+    }
     return found;
 }
 
@@ -1331,7 +1666,10 @@ kf_bool_t kf_sweep_sphere_aabb( kf_vec3_t start, kf_vec3_t end, kf_fixed_t radiu
     const kf_sphere_t sphere = {start, radius};
     kf_hit_t hit;
     const kf_bool_t result = kf_sweep_sphere_aabb_hit( &sphere, kf_vec3_sub( end, start ), box, &hit );
-    if( result == KF_TRUE && hit_time != NULL ) *hit_time = hit.fraction;
+    if( result == KF_TRUE && hit_time != NULL )
+    {
+        *hit_time = hit.fraction;
+    }
     return result;
 }
 
@@ -1342,8 +1680,14 @@ kf_bool_t kf_world_sweep_sphere( const kf_aabb_t * boxes, size_t count, kf_vec3_
     const kf_bool_t result = kf_world_sweep_sphere_hit( boxes, count, &sphere, kf_vec3_sub( end, start ), &hit );
     if( result == KF_TRUE )
     {
-        if( hit_time != NULL ) *hit_time = hit.fraction;
-        if( brush_id != NULL ) *brush_id = hit.object_id;
+        if( hit_time != NULL )
+        {
+            *hit_time = hit.fraction;
+        }
+        if( brush_id != NULL )
+        {
+            *brush_id = hit.object_id;
+        }
     }
     return result;
 }
@@ -1354,14 +1698,23 @@ kf_bool_t kf_world_line_blocked( const kf_aabb_t * boxes, size_t count, kf_vec3_
     const kf_fixed_t length = kf_vec3_length( delta );
     const kf_ray_t ray = {start, delta, length};
     kf_hit_t hit;
-    if( length == 0 || kf_world_raycast( boxes, count, &ray, &hit ) == KF_FALSE ) return KF_FALSE;
+    if( length == 0 || kf_world_raycast( boxes, count, &ray, &hit ) == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     return (kf_bool_t)(hit.fraction > minimum_time && hit.fraction < maximum_time);
 }
 
 static const kf_aabb_t * __kf_world_find_box( const kf_aabb_t * boxes, size_t count, uint32_t id )
 {
     size_t index;
-    for( index = 0; index != count; ++index ) if( boxes[index].id == id ) return boxes + index;
+    for( index = 0; index != count; ++index )
+    {
+        if( boxes[index].id == id )
+        {
+            return boxes + index;
+        }
+    }
     return NULL;
 }
 
@@ -1369,10 +1722,19 @@ KF_FORCE_INLINE kf_fixed_t __kf_character_safe_fraction( kf_fixed_t fraction, kf
 {
     int64_t numerator;
     int64_t quotient;
-    if( fraction <= 0 || distance <= 0 || skin <= 0 ) return kf_fixed_max( fraction, 0 );
-    if( __kf_wide_sub( (int64_t)fraction * (int64_t)distance, (int64_t)skin * (int64_t)KF_FIXED_SCALE, &numerator ) == KF_FALSE ) return 0;
+    if( fraction <= 0 || distance <= 0 || skin <= 0 )
+    {
+        return kf_fixed_max( fraction, 0 );
+    }
+    if( __kf_wide_sub( (int64_t)fraction * (int64_t)distance, (int64_t)skin * (int64_t)KF_FIXED_SCALE, &numerator ) == KF_FALSE )
+    {
+        return 0;
+    }
     quotient = numerator / distance;
-    if( quotient <= 0 ) return 0;
+    if( quotient <= 0 )
+    {
+        return 0;
+    }
     KF_DEBUG_REQUIRE( quotient <= INT32_MAX, "kinefix safe fraction overflow" );
     return quotient > INT32_MAX ? 0 : (kf_fixed_t)quotient;
 }
@@ -1384,18 +1746,33 @@ static kf_bool_t __kf_character_try_step( kf_character_body_t * body, const kf_c
     kf_vec3_t rise;
     kf_hit_t hit;
     kf_fixed_t step_height;
-    if( step == NULL || body->grounded == KF_FALSE ) return KF_FALSE;
+    if( step == NULL || body->grounded == KF_FALSE )
+    {
+        return KF_FALSE;
+    }
     step_height = kf_fixed_sub( step->maximum[1], body->position.y );
-    if( step_height <= 0 || step_height > config->step_height ) return KF_FALSE;
+    if( step_height <= 0 || step_height > config->step_height )
+    {
+        return KF_FALSE;
+    }
 
     capsule.position = body->position;
     capsule.radius = config->radius;
     capsule.height = config->height;
     rise = (kf_vec3_t){0, step_height, 0};
-    if( kf_world_sweep_capsule( boxes, count, &capsule, rise, &hit ) == KF_TRUE && hit.object_id != step->id ) return KF_FALSE;
+    if( kf_world_sweep_capsule( boxes, count, &capsule, rise, &hit ) == KF_TRUE && hit.object_id != step->id )
+    {
+        return KF_FALSE;
+    }
     capsule.position = kf_vec3_add( capsule.position, rise );
-    if( kf_world_overlap_capsule( boxes, count, &capsule, NULL ) == KF_TRUE ) return KF_FALSE;
-    if( kf_world_sweep_capsule( boxes, count, &capsule, displacement, &hit ) == KF_TRUE ) return KF_FALSE;
+    if( kf_world_overlap_capsule( boxes, count, &capsule, NULL ) == KF_TRUE )
+    {
+        return KF_FALSE;
+    }
+    if( kf_world_sweep_capsule( boxes, count, &capsule, displacement, &hit ) == KF_TRUE )
+    {
+        return KF_FALSE;
+    }
     body->position = kf_vec3_add( capsule.position, displacement );
     return KF_TRUE;
 }
@@ -1406,9 +1783,18 @@ static void __kf_character_move_horizontal( kf_character_body_t * body, const kf
     kf_vec3_t displacement = {0, 0, 0};
     kf_hit_t hit;
     kf_fixed_t fraction;
-    if( delta == 0 ) return;
-    if( x_axis == KF_TRUE ) displacement.x = delta;
-    else displacement.z = delta;
+    if( delta == 0 )
+    {
+        return;
+    }
+    if( x_axis == KF_TRUE )
+    {
+        displacement.x = delta;
+    }
+    else
+    {
+        displacement.z = delta;
+    }
     capsule.position = body->position;
     capsule.radius = config->radius;
     capsule.height = config->height;
@@ -1424,10 +1810,19 @@ static void __kf_character_move_horizontal( kf_character_body_t * body, const kf
     }
     fraction = __kf_character_safe_fraction( hit.fraction, kf_fixed_abs( delta ), config->support_epsilon );
     body->position = __kf_vec3_madd( body->position, displacement, fraction );
-    if( result->blocked == KF_FALSE ) result->hit = hit;
+    if( result->blocked == KF_FALSE )
+    {
+        result->hit = hit;
+    }
     result->blocked = KF_TRUE;
-    if( x_axis == KF_TRUE ) body->velocity.x = 0;
-    else body->velocity.z = 0;
+    if( x_axis == KF_TRUE )
+    {
+        body->velocity.x = 0;
+    }
+    else
+    {
+        body->velocity.z = 0;
+    }
 }
 
 void kf_character_step( kf_character_body_t * body, const kf_character_config_t * config, const kf_aabb_t * boxes, size_t count, kf_character_result_t * result )
@@ -1438,7 +1833,10 @@ void kf_character_step( kf_character_body_t * body, const kf_character_config_t 
     kf_hit_t vertical_hit;
     kf_fixed_t boundary;
     *result = (kf_character_result_t){0};
-    if( body == NULL || config == NULL || __kf_capsule_valid( &(kf_capsule_t){body->position, config->radius, config->height} ) == KF_FALSE ) return;
+    if( body == NULL || config == NULL || __kf_capsule_valid( &(kf_capsule_t){body->position, config->radius, config->height} ) == KF_FALSE )
+    {
+        return;
+    }
     if( body->grounded == KF_FALSE )
     {
         body->velocity.y = __kf_fixed_msub( body->velocity.y, config->gravity, config->tick_seconds );
@@ -1457,7 +1855,10 @@ void kf_character_step( kf_character_body_t * body, const kf_character_config_t 
         body->position = __kf_vec3_madd( body->position, vertical_displacement, vertical_hit.fraction );
         result->landed = (kf_bool_t)(body->grounded == KF_FALSE && displacement.y < 0);
         result->hit_ceiling = (kf_bool_t)(displacement.y > 0);
-        if( result->blocked == KF_FALSE ) result->hit = vertical_hit;
+        if( result->blocked == KF_FALSE )
+        {
+            result->hit = vertical_hit;
+        }
         result->blocked = KF_TRUE;
         body->velocity.y = 0;
         body->grounded = (kf_bool_t)(displacement.y < 0);
@@ -1474,8 +1875,24 @@ void kf_character_step( kf_character_body_t * body, const kf_character_config_t 
     }
 
     boundary = kf_fixed_sub( config->arena_half_extent, config->radius );
-    if( body->position.x < -boundary ) { body->position.x = -boundary; body->velocity.x = 0; }
-    if( body->position.x > boundary ) { body->position.x = boundary; body->velocity.x = 0; }
-    if( body->position.z < -boundary ) { body->position.z = -boundary; body->velocity.z = 0; }
-    if( body->position.z > boundary ) { body->position.z = boundary; body->velocity.z = 0; }
+    if( body->position.x < -boundary )
+   {
+       body->position.x = -boundary;
+       body->velocity.x = 0;
+   }
+    if( body->position.x > boundary )
+   {
+       body->position.x = boundary;
+       body->velocity.x = 0;
+   }
+    if( body->position.z < -boundary )
+   {
+       body->position.z = -boundary;
+       body->velocity.z = 0;
+   }
+    if( body->position.z > boundary )
+   {
+       body->position.z = boundary;
+       body->velocity.z = 0;
+   }
 }

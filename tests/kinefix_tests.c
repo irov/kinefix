@@ -4,7 +4,15 @@
 
 static int failures = 0;
 
-#define CHECK(Expression) do { if( !(Expression) ) { fprintf( stderr, "failed line %d: %s\n", __LINE__, #Expression ); ++failures; } } while( 0 )
+#define CHECK(Expression) \
+    do \
+    { \
+        if( !(Expression) ) \
+        { \
+            fprintf( stderr, "failed line %d: %s\n", __LINE__, #Expression ); \
+            ++failures; \
+        } \
+    } while( 0 )
 #define F(Value) kf_fixed_from_float( (float)(Value) )
 
 static kf_bool_t fixed_near( kf_fixed_t left, kf_fixed_t right )
@@ -36,6 +44,8 @@ int main( void )
     CHECK( kf_fixed_from_ratio( -3, 2 ) == F(-1.5) );
     CHECK( kf_fixed_to_int( F(2.75) ) == 2 );
     CHECK( kf_fixed_to_int( F(-2.75) ) == -2 );
+    CHECK( kf_fixed_to_float( F(2.75) ) == 2.75f );
+    CHECK( kf_fixed_to_float( F(-2.75) ) == -2.75f );
     CHECK( kf_fixed_mul( F(1.5), F(-2.25) ) == F(-3.375) );
     CHECK( kf_fixed_div( F(-2.25), F(1.5) ) == F(-1.5) );
     CHECK( kf_fixed_add_mul( 1, -1, KF_FIXED_SCALE / 2 ) == 0 );
@@ -78,7 +88,10 @@ int main( void )
     }
     kf_pcg32_seed( &first, 42, 54 );
     kf_pcg32_seed( &second, 42, 54 );
-    for( index = 0; index != 1000; ++index ) CHECK( kf_pcg32_next( &first ) == kf_pcg32_next( &second ) );
+    for( index = 0; index != 1000; ++index )
+    {
+        CHECK( kf_pcg32_next( &first ) == kf_pcg32_next( &second ) );
+    }
 
     CHECK( kf_world_character_collides( &floor_box, 1, body.position, config.radius, config.height ) == KF_FALSE );
     body.grounded = KF_FALSE;
@@ -221,7 +234,10 @@ int main( void )
         CHECK( step_body.grounded == KF_TRUE );
     }
 
-    if( failures != 0 ) return 1;
+    if( failures != 0 )
+    {
+        return 1;
+    }
     puts( "kinefix C tests passed" );
     return 0;
 }
