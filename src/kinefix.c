@@ -1042,7 +1042,7 @@ kf_bool_t kf_world_raycast( const kf_aabb_t * boxes, size_t count, const kf_ray_
 {
     size_t index;
     kf_bool_t found = KF_FALSE;
-    kf_hit_t selected;
+    kf_hit_t selected = {0};
     for( index = 0; index != count; ++index )
     {
         kf_hit_t candidate;
@@ -1077,7 +1077,7 @@ kf_bool_t kf_world_sweep_sphere_hit( const kf_aabb_t * boxes, size_t count, cons
 {
     size_t index;
     kf_bool_t found = KF_FALSE;
-    kf_hit_t selected;
+    kf_hit_t selected = {0};
     for( index = 0; index != count; ++index )
     {
         kf_hit_t candidate;
@@ -1281,7 +1281,7 @@ kf_bool_t kf_world_sweep_capsule( const kf_aabb_t * boxes, size_t count, const k
 {
     size_t index;
     kf_bool_t found = KF_FALSE;
-    kf_hit_t selected;
+    kf_hit_t selected = {0};
     for( index = 0; index != count; ++index )
     {
         kf_hit_t candidate;
