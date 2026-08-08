@@ -26,7 +26,7 @@ int main( void )
     kf_fixed_t cosine;
     kf_pcg32_t first;
     kf_pcg32_t second;
-    kf_aabb_t floor_box = {1u, {-KF_FIXED_SCALE, -KF_FIXED_SCALE, -KF_FIXED_SCALE}, {KF_FIXED_SCALE, 0, KF_FIXED_SCALE}};
+    kf_collider_t floor_collider = {1u, {{-KF_FIXED_SCALE, -KF_FIXED_SCALE, -KF_FIXED_SCALE}, {KF_FIXED_SCALE, 0, KF_FIXED_SCALE}}};
     kf_character_body_t body = {{0, 0, 0}, {0, 0, 0}, KF_TRUE};
     kf_character_config_t config = {
         KF_FIXED_SCALE / 4, KF_FIXED_SCALE, KF_FIXED_SCALE / 2,
@@ -93,17 +93,17 @@ int main( void )
         CHECK( kf_pcg32_next( &first ) == kf_pcg32_next( &second ) );
     }
 
-    CHECK( kf_world_character_collides( &floor_box, 1, body.position, config.radius, config.height ) == KF_FALSE );
+    CHECK( kf_world_character_collides( &floor_collider, 1, body.position, config.radius, config.height ) == KF_FALSE );
     body.grounded = KF_FALSE;
-    kf_character_step( &body, &config, &floor_box, 1, &result );
+    kf_character_step( &body, &config, &floor_collider, 1, &result );
     CHECK( body.grounded == KF_TRUE );
     CHECK( body.position.y == 0 );
 
     {
-        const kf_aabb_t box = {7u, {0, -KF_FIXED_SCALE, -KF_FIXED_SCALE}, {KF_FIXED_SCALE, KF_FIXED_SCALE, KF_FIXED_SCALE}};
+        const kf_collider_t collider = {7u, {{0, -KF_FIXED_SCALE, -KF_FIXED_SCALE}, {KF_FIXED_SCALE, KF_FIXED_SCALE, KF_FIXED_SCALE}}};
         const kf_ray_t ray = {{-kf_fixed_from_int( 10 ), 0, 0}, {KF_FIXED_SCALE, 0, 0}, kf_fixed_from_int( 20 )};
         kf_hit_t hit;
-        CHECK( kf_raycast_aabb( &ray, &box, &hit ) == KF_TRUE );
+        CHECK( kf_world_raycast( &collider, 1, &ray, &hit ) == KF_TRUE );
         CHECK( hit.object_id == 7u );
         CHECK( fixed_near( hit.fraction, F(0.5) ) );
         CHECK( fixed_near( hit.distance, kf_fixed_from_int( 10 ) ) );
@@ -113,7 +113,7 @@ int main( void )
     }
 
     {
-        const kf_aabb_t box = {82u, {KF_FIXED_SCALE, -KF_FIXED_SCALE, -KF_FIXED_SCALE}, {kf_fixed_from_int( 2 ), KF_FIXED_SCALE, KF_FIXED_SCALE}};
+        const kf_aabb_t box = {{KF_FIXED_SCALE, -KF_FIXED_SCALE, -KF_FIXED_SCALE}, {kf_fixed_from_int( 2 ), KF_FIXED_SCALE, KF_FIXED_SCALE}};
         const kf_ray_t ray = {{-kf_fixed_from_int( 1000 ), 0, 0}, {KF_FIXED_SCALE, 0, 0}, kf_fixed_from_int( 2000 )};
         kf_hit_t hit;
         CHECK( kf_raycast_aabb( &ray, &box, &hit ) == KF_TRUE );
@@ -123,7 +123,7 @@ int main( void )
     }
 
     {
-        const kf_aabb_t box = {8u, {0, -KF_FIXED_SCALE, -KF_FIXED_SCALE}, {KF_FIXED_SCALE, KF_FIXED_SCALE, KF_FIXED_SCALE}};
+        const kf_aabb_t box = {{0, -KF_FIXED_SCALE, -KF_FIXED_SCALE}, {KF_FIXED_SCALE, KF_FIXED_SCALE, KF_FIXED_SCALE}};
         const kf_sphere_t sphere = {{-kf_fixed_from_int( 10 ), 0, 0}, KF_FIXED_SCALE};
         kf_hit_t hit;
         CHECK( kf_sweep_sphere_aabb_hit( &sphere, (kf_vec3_t){kf_fixed_from_int( 20 ), 0, 0}, &box, &hit ) == KF_TRUE );
@@ -133,7 +133,7 @@ int main( void )
     }
 
     {
-        const kf_aabb_t corner = {10u, {0, 0, 0}, {KF_FIXED_SCALE, kf_fixed_from_int( 3 ), KF_FIXED_SCALE}};
+        const kf_aabb_t corner = {{0, 0, 0}, {KF_FIXED_SCALE, kf_fixed_from_int( 3 ), KF_FIXED_SCALE}};
         kf_capsule_t capsule = {{F(1.4), 0, F(1.4)}, F(0.5), kf_fixed_from_int( 2 )};
         CHECK( kf_overlap_capsule_aabb( &capsule, &corner ) == KF_FALSE );
         capsule.position.x = F(1.3);
@@ -142,9 +142,9 @@ int main( void )
     }
 
     {
-        const kf_aabb_t walls[2] = {
-            {9u, {0, 0, -KF_FIXED_SCALE}, {F(0.1), kf_fixed_from_int( 3 ), KF_FIXED_SCALE}},
-            {3u, {0, 0, -KF_FIXED_SCALE}, {F(0.1), kf_fixed_from_int( 3 ), KF_FIXED_SCALE}}};
+        const kf_collider_t walls[2] = {
+            {9u, {{0, 0, -KF_FIXED_SCALE}, {F(0.1), kf_fixed_from_int( 3 ), KF_FIXED_SCALE}}},
+            {3u, {{0, 0, -KF_FIXED_SCALE}, {F(0.1), kf_fixed_from_int( 3 ), KF_FIXED_SCALE}}}};
         const kf_capsule_t capsule = {{-kf_fixed_from_int( 10 ), 0, 0}, F(0.5), kf_fixed_from_int( 2 )};
         kf_hit_t hit;
         CHECK( kf_world_sweep_capsule( walls, 2, &capsule, (kf_vec3_t){kf_fixed_from_int( 20 ), 0, 0}, &hit ) == KF_TRUE );
@@ -202,9 +202,9 @@ int main( void )
     }
 
     {
-        const kf_aabb_t world[2] = {
-            {1u, {-kf_fixed_from_int( 100 ), -KF_FIXED_SCALE, -kf_fixed_from_int( 100 )}, {kf_fixed_from_int( 100 ), 0, kf_fixed_from_int( 100 )}},
-            {2u, {0, 0, -KF_FIXED_SCALE}, {F(0.1), kf_fixed_from_int( 3 ), KF_FIXED_SCALE}}};
+        const kf_collider_t world[2] = {
+            {1u, {{-kf_fixed_from_int( 100 ), -KF_FIXED_SCALE, -kf_fixed_from_int( 100 )}, {kf_fixed_from_int( 100 ), 0, kf_fixed_from_int( 100 )}}},
+            {2u, {{0, 0, -KF_FIXED_SCALE}, {F(0.1), kf_fixed_from_int( 3 ), KF_FIXED_SCALE}}}};
         kf_character_body_t fast_body = {{-kf_fixed_from_int( 10 ), 0, 0}, {kf_fixed_from_int( 2000 ), 0, 0}, KF_TRUE};
         const kf_character_config_t fast_config = {
             F(0.5), kf_fixed_from_int( 2 ), F(0.4),
@@ -219,9 +219,9 @@ int main( void )
     }
 
     {
-        const kf_aabb_t world[2] = {
-            {1u, {-kf_fixed_from_int( 10 ), -KF_FIXED_SCALE, -kf_fixed_from_int( 10 )}, {kf_fixed_from_int( 10 ), 0, kf_fixed_from_int( 10 )}},
-            {2u, {0, 0, -KF_FIXED_SCALE}, {KF_FIXED_SCALE, F(0.25), KF_FIXED_SCALE}}};
+        const kf_collider_t world[2] = {
+            {1u, {{-kf_fixed_from_int( 10 ), -KF_FIXED_SCALE, -kf_fixed_from_int( 10 )}, {kf_fixed_from_int( 10 ), 0, kf_fixed_from_int( 10 )}}},
+            {2u, {{0, 0, -KF_FIXED_SCALE}, {KF_FIXED_SCALE, F(0.25), KF_FIXED_SCALE}}}};
         kf_character_body_t step_body = {{-KF_FIXED_SCALE, 0, 0}, {kf_fixed_from_int( 100 ), 0, 0}, KF_TRUE};
         const kf_character_config_t step_config = {
             F(0.25), KF_FIXED_SCALE, F(0.5),

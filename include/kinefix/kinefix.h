@@ -52,10 +52,15 @@ typedef struct kf_pcg32_t
 
 typedef struct kf_aabb_t
 {
-    uint32_t id;
-    kf_fixed_t minimum[3];
-    kf_fixed_t maximum[3];
+    kf_vec3_t minimum;
+    kf_vec3_t maximum;
 } kf_aabb_t;
+
+typedef struct kf_collider_t
+{
+    uint32_t id;
+    kf_aabb_t bounds;
+} kf_collider_t;
 
 typedef struct kf_sphere_t
 {
@@ -196,28 +201,28 @@ uint32_t kf_pcg32_bounded( kf_pcg32_t * random, uint32_t bound );
 void kf_pcg32_restore( kf_pcg32_t * random, uint64_t state, uint64_t stream );
 
 kf_bool_t kf_aabb_overlaps_character( const kf_aabb_t * box, kf_vec3_t position, kf_fixed_t half_width, kf_fixed_t height );
-kf_bool_t kf_world_character_collides( const kf_aabb_t * boxes, size_t count, kf_vec3_t position, kf_fixed_t half_width, kf_fixed_t height );
-kf_bool_t kf_world_find_step_top( const kf_aabb_t * boxes, size_t count, kf_vec3_t candidate, kf_fixed_t half_width, kf_fixed_t height, kf_fixed_t current_y, kf_fixed_t maximum_step, kf_fixed_t * top );
+kf_bool_t kf_world_character_collides( const kf_collider_t * colliders, size_t count, kf_vec3_t position, kf_fixed_t half_width, kf_fixed_t height );
+kf_bool_t kf_world_find_step_top( const kf_collider_t * colliders, size_t count, kf_vec3_t candidate, kf_fixed_t half_width, kf_fixed_t height, kf_fixed_t current_y, kf_fixed_t maximum_step, kf_fixed_t * top );
 
 kf_bool_t kf_overlap_aabb_aabb( const kf_aabb_t * left, const kf_aabb_t * right );
 kf_bool_t kf_overlap_sphere_aabb( const kf_sphere_t * sphere, const kf_aabb_t * box );
 kf_bool_t kf_overlap_capsule_aabb( const kf_capsule_t * capsule, const kf_aabb_t * box );
 kf_bool_t kf_overlap_sphere_capsule( const kf_sphere_t * sphere, const kf_capsule_t * capsule );
 kf_bool_t kf_overlap_capsule_capsule( const kf_capsule_t * left, const kf_capsule_t * right );
-kf_bool_t kf_world_overlap_capsule( const kf_aabb_t * boxes, size_t count, const kf_capsule_t * capsule, uint32_t * brush_id );
+kf_bool_t kf_world_overlap_capsule( const kf_collider_t * colliders, size_t count, const kf_capsule_t * capsule, uint32_t * collider_id );
 
 kf_bool_t kf_raycast_aabb( const kf_ray_t * ray, const kf_aabb_t * box, kf_hit_t * hit );
 kf_bool_t kf_raycast_capsule( const kf_ray_t * ray, const kf_capsule_t * capsule, uint32_t object_id, kf_hit_t * hit );
-kf_bool_t kf_world_raycast( const kf_aabb_t * boxes, size_t count, const kf_ray_t * ray, kf_hit_t * hit );
+kf_bool_t kf_world_raycast( const kf_collider_t * colliders, size_t count, const kf_ray_t * ray, kf_hit_t * hit );
 kf_bool_t kf_sweep_sphere_aabb_hit( const kf_sphere_t * sphere, kf_vec3_t displacement, const kf_aabb_t * box, kf_hit_t * hit );
-kf_bool_t kf_world_sweep_sphere_hit( const kf_aabb_t * boxes, size_t count, const kf_sphere_t * sphere, kf_vec3_t displacement, kf_hit_t * hit );
+kf_bool_t kf_world_sweep_sphere_hit( const kf_collider_t * colliders, size_t count, const kf_sphere_t * sphere, kf_vec3_t displacement, kf_hit_t * hit );
 kf_bool_t kf_sweep_sphere_capsule( const kf_sphere_t * sphere, kf_vec3_t displacement, const kf_capsule_t * capsule, uint32_t object_id, kf_hit_t * hit );
 kf_bool_t kf_sweep_capsule_aabb( const kf_capsule_t * capsule, kf_vec3_t displacement, const kf_aabb_t * box, kf_hit_t * hit );
-kf_bool_t kf_world_sweep_capsule( const kf_aabb_t * boxes, size_t count, const kf_capsule_t * capsule, kf_vec3_t displacement, kf_hit_t * hit );
+kf_bool_t kf_world_sweep_capsule( const kf_collider_t * colliders, size_t count, const kf_capsule_t * capsule, kf_vec3_t displacement, kf_hit_t * hit );
 
 kf_bool_t kf_sweep_sphere_aabb( kf_vec3_t start, kf_vec3_t end, kf_fixed_t radius, const kf_aabb_t * box, kf_fixed_t * hit_time );
-kf_bool_t kf_world_sweep_sphere( const kf_aabb_t * boxes, size_t count, kf_vec3_t start, kf_vec3_t end, kf_fixed_t radius, kf_fixed_t * hit_time, uint32_t * brush_id );
-kf_bool_t kf_world_line_blocked( const kf_aabb_t * boxes, size_t count, kf_vec3_t start, kf_vec3_t end, kf_fixed_t minimum_time, kf_fixed_t maximum_time );
-void kf_character_step( kf_character_body_t * body, const kf_character_config_t * config, const kf_aabb_t * boxes, size_t count, kf_character_result_t * result );
+kf_bool_t kf_world_sweep_sphere( const kf_collider_t * colliders, size_t count, kf_vec3_t start, kf_vec3_t end, kf_fixed_t radius, kf_fixed_t * hit_time, uint32_t * collider_id );
+kf_bool_t kf_world_line_blocked( const kf_collider_t * colliders, size_t count, kf_vec3_t start, kf_vec3_t end, kf_fixed_t minimum_time, kf_fixed_t maximum_time );
+void kf_character_step( kf_character_body_t * body, const kf_character_config_t * config, const kf_collider_t * colliders, size_t count, kf_character_result_t * result );
 
 #endif
