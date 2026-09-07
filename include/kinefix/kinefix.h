@@ -124,6 +124,7 @@ typedef struct kf_character_result_t
 kf_fixed_t kf_fixed_from_int( int64_t value );
 kf_fixed_t kf_fixed_from_ratio( int64_t numerator, int64_t denominator );
 kf_fixed_t kf_fixed_from_float( float value );
+kf_fixed_t kf_fixed_from_double( double value );
 int32_t kf_fixed_to_int( kf_fixed_t value );
 float kf_fixed_to_float( kf_fixed_t value );
 double kf_fixed_to_double( kf_fixed_t value );

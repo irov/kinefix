@@ -1,5 +1,7 @@
 #include "kinefix/kinefix.h"
 
+#include <float.h>
+#include <math.h>
 #include <stdio.h>
 
 static int failures = 0;
@@ -13,7 +15,52 @@ static int failures = 0;
             ++failures; \
         } \
     } while( 0 )
-#define F(Value) kf_fixed_from_float( (float)(Value) )
+#define F(Value) kf_fixed_from_double( (double)(Value) )
+
+static void test_fixed_conversions( void )
+{
+    float values[] = {0.f, -0.f, 1.75f, -1.75f, FLT_MIN, -FLT_MIN, 32767.f, -32768.f};
+    size_t valueIndex;
+
+    CHECK( kf_fixed_from_double( 0.0 ) == 0 );
+    CHECK( kf_fixed_from_double( -0.0 ) == 0 );
+    CHECK( kf_fixed_from_double( 1.75 ) == 114688 );
+    CHECK( kf_fixed_from_double( -1.75 ) == -114688 );
+    CHECK( kf_fixed_from_double( 0.5 / KF_FIXED_SCALE ) == 0 );
+    CHECK( kf_fixed_from_double( -0.5 / KF_FIXED_SCALE ) == 0 );
+    CHECK( kf_fixed_from_double( 1.5 / KF_FIXED_SCALE ) == 1 );
+    CHECK( kf_fixed_from_double( -1.5 / KF_FIXED_SCALE ) == -1 );
+    CHECK( kf_fixed_from_double( DBL_MIN ) == 0 );
+    CHECK( kf_fixed_from_double( -DBL_MIN ) == 0 );
+    CHECK( kf_fixed_from_double( (double)INT32_MAX / KF_FIXED_SCALE ) == INT32_MAX );
+    CHECK( kf_fixed_from_double( (double)INT32_MIN / KF_FIXED_SCALE ) == INT32_MIN );
+
+    /* These doubles round to +/-1 as floats and used to lose one fixed unit. */
+    CHECK( kf_fixed_from_double( 1.0 - 0x1p-25 ) == KF_FIXED_SCALE - 1 );
+    CHECK( kf_fixed_from_double( -1.0 + 0x1p-25 ) == -KF_FIXED_SCALE + 1 );
+
+    for( valueIndex = 0; valueIndex != sizeof(values) / sizeof(values[0]); ++valueIndex )
+    {
+        float value = values[valueIndex];
+        double scaled = (double)value * KF_FIXED_SCALE;
+        CHECK( kf_fixed_from_float( value ) == (kf_fixed_t)scaled );
+    }
+
+#if defined(NDEBUG)
+    CHECK( kf_fixed_from_double( NAN ) == 0 );
+    CHECK( kf_fixed_from_double( INFINITY ) == 0 );
+    CHECK( kf_fixed_from_double( -INFINITY ) == 0 );
+    CHECK( kf_fixed_from_double( DBL_MAX ) == 0 );
+    CHECK( kf_fixed_from_double( -DBL_MAX ) == 0 );
+    CHECK( kf_fixed_from_double( ((double)INT32_MAX + 0.25) / KF_FIXED_SCALE ) == 0 );
+    CHECK( kf_fixed_from_double( ((double)INT32_MIN - 0.25) / KF_FIXED_SCALE ) == 0 );
+    CHECK( kf_fixed_from_float( NAN ) == 0 );
+    CHECK( kf_fixed_from_float( INFINITY ) == 0 );
+    CHECK( kf_fixed_from_float( -INFINITY ) == 0 );
+    CHECK( kf_fixed_from_float( FLT_MAX ) == 0 );
+    CHECK( kf_fixed_from_float( -FLT_MAX ) == 0 );
+#endif
+}
 
 static kf_bool_t fixed_near( kf_fixed_t left, kf_fixed_t right )
 {
@@ -33,6 +80,8 @@ int main( void )
         kf_fixed_from_int( 20 ), F(0.01), F(0.02), kf_fixed_from_int( 32 )};
     kf_character_result_t result;
     uint32_t index;
+
+    test_fixed_conversions();
 
     CHECK( sizeof(kf_fixed_t) == 4u );
     CHECK( sizeof(kf_bool_t) == 1u );

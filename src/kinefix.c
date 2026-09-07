@@ -515,13 +515,19 @@ kf_fixed_t kf_fixed_from_ratio( __kf_int64_t numerator, __kf_int64_t denominator
 
 kf_fixed_t kf_fixed_from_float( float value )
 {
-    const double scaled = (double)value * (double)KF_FIXED_SCALE;
-    KF_DEBUG_REQUIRE( scaled == scaled, "kinefix float conversion requires a number" );
+    kf_fixed_t result = kf_fixed_from_double( (double)value );
+    return result;
+}
+
+kf_fixed_t kf_fixed_from_double( double value )
+{
+    double scaled = value * (double)KF_FIXED_SCALE;
+    KF_DEBUG_REQUIRE( scaled == scaled, "kinefix double conversion requires a number" );
     if( scaled != scaled )
     {
         return 0;
     }
-    KF_DEBUG_REQUIRE( scaled >= (double)INT32_MIN && scaled <= (double)INT32_MAX, "kinefix float conversion overflow" );
+    KF_DEBUG_REQUIRE( scaled >= (double)INT32_MIN && scaled <= (double)INT32_MAX, "kinefix double conversion overflow" );
     if( scaled < (double)INT32_MIN || scaled > (double)INT32_MAX )
     {
         return 0;

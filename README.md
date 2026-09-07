@@ -17,10 +17,13 @@ Quadratic sweep coefficients remain Q32.32, while their Q64.64 discriminant uses
 an unsigned 128-bit backend with a portable two-limb implementation for MSVC.
 Public fixed values remain 32-bit.
 
-`kf_fixed_from_float` is a convenience conversion for tests, tools, and other
-non-authoritative boundaries. It truncates toward zero. Authoritative constants
-should be stored as raw Q16.16 values or generated from decimal source data at
-content-build time.
+`kf_fixed_from_float` and `kf_fixed_from_double` are convenience conversions for
+tests, tools, and other non-authoritative boundaries. They scale in double
+precision and truncate toward zero. Use `kf_fixed_from_double` for double inputs
+to avoid losing precision in an intermediate float. NaN, infinity, and values
+whose scaled result is outside `[INT32_MIN, INT32_MAX]` trigger a debug assertion
+and return zero in release builds. Authoritative constants should be stored as
+raw Q16.16 values or generated from decimal source data at content-build time.
 
 Collision primitives and queries include:
 
